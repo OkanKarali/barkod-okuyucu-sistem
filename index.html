@@ -127,18 +127,46 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
 
-            // --- Product Database (now using let to be modifiable) ---
-            let productDatabase = {
-                '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 },
-                '8690504012177': { name: 'Eti Canga 45g', price: 9.75 },
-                '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 },
-                '8690987654321': { name: 'Pınar Süt 1L', price: 38.50 },
-                '8681234567890': { name: 'Saka Su 0.5L', price: 5.00 },
-                '8690526000018': { name: 'Tadım Ay Çekirdeği', price: 25.00 },
-                '8697404547012': { name: 'Fuse Tea Şeftali 1L', price: 28.90 },
-                '5000112664553': { name: 'Coca Cola 2.5lt', price: 75.00 },
-                '5000112672039': { name: 'Coca Cola 1.5lt', price: 65.00 },
-            };
+            const DB_STORAGE_KEY = 'barcodeScannerProducts';
+
+            // --- LocalStorage Functions ---
+            /**
+             * Loads the product database from localStorage. If not found, loads default data.
+             * @returns {object} The product database object.
+             */
+            function loadProductDatabase() {
+                const savedDB = localStorage.getItem(DB_STORAGE_KEY);
+                if (savedDB) {
+                    return JSON.parse(savedDB);
+                } else {
+                    // Default data for the first run
+                    const defaultDB = {
+                        '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 },
+                        '8690504012177': { name: 'Eti Canga 45g', price: 9.75 },
+                        '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 },
+                        '8690987654321': { name: 'Pınar Süt 1L', price: 38.50 },
+                        '8681234567890': { name: 'Saka Su 0.5L', price: 5.00 },
+                        '8690526000018': { name: 'Tadım Ay Çekirdeği', price: 25.00 },
+                        '8697404547012': { name: 'Fuse Tea Şeftali 1L', price: 28.90 },
+                        '5000112664553': { name: 'Coca Cola 2.5lt', price: 75.00 },
+                        '5000112672039': { name: 'Coca Cola 1.5lt', price: 65.00 },
+                    };
+                    // Save the default to localStorage for next time
+                    localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(defaultDB));
+                    return defaultDB;
+                }
+            }
+            
+            /**
+             * Saves the current product database to localStorage.
+             */
+            function saveProductDatabase() {
+                localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(productDatabase));
+            }
+
+
+            // --- Product Database ---
+            let productDatabase = loadProductDatabase();
 
             // --- Application State ---
             let cart = {}; 
@@ -158,7 +186,6 @@
             const formSubmitBtn = document.getElementById('form-submit-button');
             const formCancelBtn = document.getElementById('form-cancel-button');
             const scannedItemsList = document.getElementById('scanned-items-list');
-            const emptyCartMessage = document.getElementById('empty-cart-message');
             const totalPriceElement = document.getElementById('total-price');
             const scanResultElement = document.getElementById('scan-result');
             const scannerStatusElement = document.getElementById('scanner-status');
@@ -224,14 +251,12 @@
                     return;
                 }
                 
-                // Edit Mode
                 if (originalBC) {
-                    if (originalBC !== barcode) { // If barcode was changed
+                    if (originalBC !== barcode) { 
                         delete productDatabase[originalBC];
                     }
                     productDatabase[barcode] = { name, price };
                 } 
-                // Add Mode
                 else {
                      if (productDatabase[barcode]) {
                         alert('Bu barkod zaten kayıtlı!');
@@ -240,6 +265,7 @@
                     productDatabase[barcode] = { name, price };
                 }
                 
+                saveProductDatabase(); // <-- Save changes to localStorage
                 renderProductManagementList();
                 resetProductForm();
             });
@@ -255,7 +281,6 @@
                     barcodeInput.value = barcode;
                     nameInput.value = item.name;
                     priceInput.value = item.price;
-
                     formTitle.textContent = 'Ürünü Düzenle';
                     formSubmitBtn.textContent = 'Güncelle';
                     formSubmitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
@@ -267,6 +292,7 @@
                     const barcode = deleteBtn.dataset.barcode;
                     if (confirm(`'${productDatabase[barcode].name}' ürününü silmek istediğinize emin misiniz?`)) {
                         delete productDatabase[barcode];
+                        saveProductDatabase(); // <-- Save changes to localStorage
                         renderProductManagementList();
                     }
                 }
@@ -274,8 +300,7 @@
 
             formCancelBtn.addEventListener('click', resetProductForm);
 
-            // --- Cart Logic (largely unchanged) ---
-
+            // --- Cart Logic ---
             function updateCartUI() {
                 scannedItemsList.innerHTML = '';
                 if (Object.keys(cart).length === 0) {
@@ -304,11 +329,10 @@
                 totalPriceElement.textContent = `${total.toFixed(2)} TL`;
             }
             
-            function onScanSuccess(decodedText, decodedResult) {
+            function onScanSuccess(decodedText) {
                 const now = Date.now();
                 if (now - lastScanTime < 2000) { return; }
                 lastScanTime = now;
-
                 const productInfo = productDatabase[decodedText];
                 if (productInfo) {
                     scanResultElement.textContent = `Eklendi: ${productInfo.name}`;
@@ -348,11 +372,9 @@
             // --- Initialization ---
             const html5QrCode = new Html5Qrcode("qr-reader");
             const config = { fps: 10, qrbox: { width: 250, height: 150 } };
-
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
                 .then(() => { scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.'; })
-                .catch(err => { scannerStatusElement.textContent = 'Kamera başlatılamadı!'; });
-
+                .catch(() => { scannerStatusElement.textContent = 'Kamera başlatılamadı!'; });
             resetButton.addEventListener('click', resetScanner);
             updateCartUI();
         });
