@@ -159,7 +159,6 @@
         import { getFirestore, doc, getDocs, setDoc, deleteDoc, onSnapshot, collection, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Initialization ---
-        // This configuration is now hard-coded for deployment on GitHub Pages.
         const firebaseConfig = {
           apiKey: "AIzaSyCs1NG_FD0FtMsngcLF699ZYTnfklgDw2M",
           authDomain: "karalimedia-1d72f.firebaseapp.com",
@@ -173,54 +172,148 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = firebaseConfig.projectId; // Use projectId for a cleaner path
+        const appId = firebaseConfig.projectId;
         
         let productDatabase = {};
-        let productCollectionRef; // Will be set after auth
-        let unsubscribeProducts; // To stop the real-time listener
+        let productCollectionRef;
+        let unsubscribeProducts;
 
+        // --- DOM Elements (Global Scope) ---
+        const manageProductsBtn = document.getElementById('manage-products-btn');
+        const productModal = document.getElementById('product-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const productManagementList = document.getElementById('product-management-list');
+        const productForm = document.getElementById('product-form');
+        const formTitle = document.getElementById('form-title');
+        const originalBarcode = document.getElementById('original-barcode-input');
+        const barcodeInput = document.getElementById('barcode-input');
+        const nameInput = document.getElementById('name-input');
+        const priceInput = document.getElementById('price-input');
+        const formSubmitBtn = document.getElementById('form-submit-button');
+        const formCancelBtn = document.getElementById('form-cancel-button');
+        const scanBarcodeInFormBtn = document.getElementById('scan-barcode-in-form-btn');
+        const formScannerContainer = document.getElementById('form-scanner-container');
+        const closeFormScannerBtn = document.getElementById('close-form-scanner-btn');
+        const findByScanBtn = document.getElementById('find-by-scan-btn');
+        const scannedItemsList = document.getElementById('scanned-items-list');
+        const totalPriceElement = document.getElementById('total-price');
+        const scanResultElement = document.getElementById('scan-result');
+        const scannerStatusElement = document.getElementById('scanner-status');
+        const resetButton = document.getElementById('reset-button');
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const modalMessage = document.getElementById('modal-message');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        let confirmCallback = null;
+
+        // --- UI Rendering Functions (Global Scope) ---
+        function populateFormForEditing(barcode, item) {
+            originalBarcode.value = barcode;
+            barcodeInput.value = barcode;
+            nameInput.value = item.name;
+            priceInput.value = item.price;
+            formTitle.textContent = 'Ürünü Düzenle';
+            formSubmitBtn.textContent = 'Güncelle';
+            formSubmitBtn.className = "w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors";
+            formCancelBtn.classList.remove('hidden');
+            productForm.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function renderProductManagementList() {
+            productManagementList.innerHTML = '';
+             if (Object.keys(productDatabase).length === 0) {
+                productManagementList.innerHTML = `<p class="text-slate-500 text-center py-4">Veritabanında ürün bulunmuyor.</p>`;
+                return;
+            }
+            Object.keys(productDatabase).sort().forEach(barcode => {
+                const item = productDatabase[barcode];
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-slate-50 p-2 rounded-md';
+                div.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-slate-800 truncate">${item.name}</p>
+                        <p class="text-sm text-slate-500 truncate">Barkod: ${barcode} - Fiyat: ${item.price.toFixed(2)} TL</p>
+                    </div>
+                    <div class="flex space-x-2 flex-shrink-0">
+                        <button data-barcode="${barcode}" class="edit-btn action-button text-blue-500 hover:text-blue-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                        <button data-barcode="${barcode}" class="delete-btn action-button text-red-500 hover:text-red-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                    </div>`;
+                productManagementList.appendChild(div);
+            });
+        }
+        
+        function resetProductForm() {
+            productForm.reset(); originalBarcode.value = ''; formTitle.textContent = 'Yeni Ürün Ekle'; formSubmitBtn.textContent = 'Ekle';
+            formSubmitBtn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors";
+            formCancelBtn.classList.add('hidden');
+        }
+
+        function showConfirmationModal(message, onConfirm, isAlert = false) {
+            modalMessage.textContent = message;
+            confirmCallback = onConfirm;
+            if (isAlert) {
+                modalConfirmBtn.textContent = "Tamam";
+                modalCancelBtn.classList.add('hidden');
+            } else {
+                modalConfirmBtn.textContent = "Evet";
+                modalCancelBtn.classList.remove('hidden');
+            }
+            confirmationModal.classList.remove('hidden');
+        }
+
+        function hideConfirmationModal() {
+             confirmationModal.classList.add('hidden');
+             confirmCallback = null;
+        }
+
+        // --- Firebase Data Functions ---
+        async function listenForProductChanges() {
+            const initialSnapshot = await getDocs(productCollectionRef);
+            if (initialSnapshot.empty) {
+                console.log("Ürün bulunamadı. Varsayılan veriler yükleniyor.");
+                await populateDefaultProducts();
+            }
+
+            if(unsubscribeProducts) unsubscribeProducts();
+            
+            unsubscribeProducts = onSnapshot(productCollectionRef, (snapshot) => {
+                const newDb = {};
+                snapshot.forEach(doc => {
+                    newDb[doc.id] = doc.data();
+                });
+                productDatabase = newDb;
+                console.log("Ürün veritabanı Firestore'dan güncellendi.");
+
+                if (!productModal.classList.contains('hidden')) {
+                    renderProductManagementList();
+                }
+            });
+        }
+        
+        async function populateDefaultProducts() {
+            const defaultDB = {
+                '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 }, '8690504012177': { name: 'Eti Canga 45g', price: 9.75 }, '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 },
+            };
+            const batch = writeBatch(db);
+            Object.keys(defaultDB).forEach(barcode => {
+                const docRef = doc(productCollectionRef, barcode);
+                batch.set(docRef, defaultDB[barcode]);
+            });
+            await batch.commit();
+        }
+
+        // --- App Initialization on DOM ready ---
         document.addEventListener('DOMContentLoaded', () => {
 
             let cart = {};
             let lastScanTime = 0;
             let formScanMode = 'add'; // 'add' or 'edit'
 
-            // --- DOM Elements ---
-            const manageProductsBtn = document.getElementById('manage-products-btn');
-            const productModal = document.getElementById('product-modal');
-            const closeModalBtn = document.getElementById('close-modal-btn');
-            const productManagementList = document.getElementById('product-management-list');
-            const productForm = document.getElementById('product-form');
-            const formTitle = document.getElementById('form-title');
-            const originalBarcode = document.getElementById('original-barcode-input');
-            const barcodeInput = document.getElementById('barcode-input');
-            const nameInput = document.getElementById('name-input');
-            const priceInput = document.getElementById('price-input');
-            const formSubmitBtn = document.getElementById('form-submit-button');
-            const formCancelBtn = document.getElementById('form-cancel-button');
-            const scanBarcodeInFormBtn = document.getElementById('scan-barcode-in-form-btn');
-            const formScannerContainer = document.getElementById('form-scanner-container');
-            const closeFormScannerBtn = document.getElementById('close-form-scanner-btn');
-            const findByScanBtn = document.getElementById('find-by-scan-btn');
-            const scannedItemsList = document.getElementById('scanned-items-list');
-            const totalPriceElement = document.getElementById('total-price');
-            const scanResultElement = document.getElementById('scan-result');
-            const scannerStatusElement = document.getElementById('scanner-status');
-            const resetButton = document.getElementById('reset-button');
-            // Modal elements
-            const confirmationModal = document.getElementById('confirmation-modal');
-            const modalMessage = document.getElementById('modal-message');
-            const modalConfirmBtn = document.getElementById('modal-confirm-btn');
-            const modalCancelBtn = document.getElementById('modal-cancel-btn');
-            let confirmCallback = null;
-            
-
             // --- Scanner Instances ---
             const mainScanner = new Html5Qrcode("qr-reader");
             const formScanner = new Html5Qrcode("form-qr-reader");
             let isMainScannerActive = false;
-
-            // --- Scanner Control Logic ---
+            
             async function startMainScanner() {
                 if (isMainScannerActive) return;
                 try {
@@ -253,9 +346,8 @@
                 formScannerContainer.classList.add('hidden');
             }
             
-            // --- Success Callbacks ---
             function onMainScanSuccess(decodedText) {
-                if (Date.now() - lastScanTime < 2000) return; // Debounce scans
+                if (Date.now() - lastScanTime < 2000) return;
                 lastScanTime = Date.now();
                 const productInfo = productDatabase[decodedText];
                 if (productInfo) {
@@ -289,49 +381,6 @@
                 }
             }
             
-            // --- Custom Modal Logic ---
-            function showConfirmationModal(message, onConfirm, isAlert = false) {
-                modalMessage.textContent = message;
-                confirmCallback = onConfirm;
-                if (isAlert) {
-                    modalConfirmBtn.textContent = "Tamam";
-                    modalCancelBtn.classList.add('hidden');
-                } else {
-                    modalConfirmBtn.textContent = "Evet";
-                    modalCancelBtn.classList.remove('hidden');
-                }
-                confirmationModal.classList.remove('hidden');
-                setTimeout(() => {
-                    confirmationModal.querySelector('.modal-backdrop').classList.remove('opacity-0');
-                    confirmationModal.querySelector('.modal-content').classList.remove('scale-95');
-                }, 10);
-            }
-
-            function hideConfirmationModal() {
-                 confirmationModal.querySelector('.modal-backdrop').classList.add('opacity-0');
-                 confirmationModal.querySelector('.modal-content').classList.add('scale-95');
-                 setTimeout(() => {
-                    confirmationModal.classList.add('hidden');
-                    confirmCallback = null;
-                 }, 300);
-            }
-
-            modalConfirmBtn.addEventListener('click', () => {
-                if (confirmCallback) {
-                    confirmCallback();
-                }
-                hideConfirmationModal();
-            });
-            modalCancelBtn.addEventListener('click', hideConfirmationModal);
-
-
-            // --- Modal & Form Logic ---
-            manageProductsBtn.addEventListener('click', async () => {
-                await stopMainScanner();
-                renderProductManagementList();
-                productModal.classList.remove('hidden');
-            });
-
             async function closeModal() {
                 await stopFormScanner();
                 productModal.classList.add('hidden');
@@ -339,112 +388,6 @@
                 await startMainScanner();
             }
 
-            closeModalBtn.addEventListener('click', closeModal);
-            productModal.addEventListener('click', (e) => {
-                if (e.target === productModal) closeModal();
-            });
-
-            scanBarcodeInFormBtn.addEventListener('click', () => {
-                formScanMode = 'add';
-                startFormScanner();
-            });
-
-            findByScanBtn.addEventListener('click', () => {
-                formScanMode = 'edit';
-                startFormScanner();
-            });
-            
-            closeFormScannerBtn.addEventListener('click', stopFormScanner);
-
-            // --- Product Management & UI Rendering ---
-            function populateFormForEditing(barcode, item) {
-                originalBarcode.value = barcode;
-                barcodeInput.value = barcode;
-                nameInput.value = item.name;
-                priceInput.value = item.price;
-                formTitle.textContent = 'Ürünü Düzenle';
-                formSubmitBtn.textContent = 'Güncelle';
-                formSubmitBtn.className = "w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors";
-                formCancelBtn.classList.remove('hidden');
-                productForm.scrollIntoView({ behavior: 'smooth' });
-            }
-
-            function renderProductManagementList() {
-                productManagementList.innerHTML = '';
-                 if (Object.keys(productDatabase).length === 0) {
-                    productManagementList.innerHTML = `<p class="text-slate-500 text-center py-4">Veritabanında ürün bulunmuyor.</p>`;
-                    return;
-                }
-                Object.keys(productDatabase).sort().forEach(barcode => {
-                    const item = productDatabase[barcode];
-                    const div = document.createElement('div');
-                    div.className = 'flex justify-between items-center bg-slate-50 p-2 rounded-md';
-                    div.innerHTML = `
-                        <div class="flex-1 min-w-0">
-                            <p class="font-semibold text-slate-800 truncate">${item.name}</p>
-                            <p class="text-sm text-slate-500 truncate">Barkod: ${barcode} - Fiyat: ${item.price.toFixed(2)} TL</p>
-                        </div>
-                        <div class="flex space-x-2 flex-shrink-0">
-                            <button data-barcode="${barcode}" class="edit-btn action-button text-blue-500 hover:text-blue-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                            <button data-barcode="${barcode}" class="delete-btn action-button text-red-500 hover:text-red-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                        </div>`;
-                    productManagementList.appendChild(div);
-                });
-            }
-
-            function resetProductForm() {
-                productForm.reset(); originalBarcode.value = ''; formTitle.textContent = 'Yeni Ürün Ekle'; formSubmitBtn.textContent = 'Ekle';
-                formSubmitBtn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors";
-                formCancelBtn.classList.add('hidden');
-            }
-
-            productForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const barcode = barcodeInput.value.trim(); 
-                const name = nameInput.value.trim(); 
-                const price = parseFloat(priceInput.value); 
-                const originalBC = originalBarcode.value;
-                if (!barcode || !name || isNaN(price)) { 
-                    showConfirmationModal('Lütfen tüm alanları doğru doldurun.', null, true);
-                    return; 
-                }
-                
-                // If originalBC exists, we are in edit mode
-                if (originalBC && originalBC !== barcode) {
-                    // Barcode has changed, so delete the old one and add a new one
-                    await deleteDoc(doc(productCollectionRef, originalBC));
-                }
-
-                if (!originalBC && productDatabase[barcode]) {
-                    showConfirmationModal('Bu barkod zaten kayıtlı!', null, true);
-                    return;
-                }
-                
-                // Add or update the product
-                const productData = { name, price };
-                await setDoc(doc(productCollectionRef, barcode), productData);
-                
-                resetProductForm();
-            });
-
-            productManagementList.addEventListener('click', (e) => {
-                const editBtn = e.target.closest('.edit-btn'); 
-                const deleteBtn = e.target.closest('.delete-btn');
-                if (editBtn) { 
-                    const barcode = editBtn.dataset.barcode; 
-                    const item = productDatabase[barcode]; 
-                    populateFormForEditing(barcode, item); 
-                }
-                if (deleteBtn) { 
-                    const barcode = deleteBtn.dataset.barcode;
-                    showConfirmationModal(`'${productDatabase[barcode].name}' ürününü silmek istediğinize emin misiniz?`, async () => {
-                         await deleteDoc(doc(productCollectionRef, barcode));
-                    });
-                }
-            });
-            formCancelBtn.addEventListener('click', resetProductForm);
-
-            // --- Cart Logic ---
             function updateCartUI() {
                 scannedItemsList.innerHTML = '';
                 if (Object.keys(cart).length === 0) { 
@@ -479,6 +422,80 @@
 
             function resetScanner() { cart = {}; scanResultElement.textContent = 'Liste temizlendi. Yeni tarama yapabilirsiniz.'; updateCartUI(); }
             
+            // --- Event Listeners ---
+            manageProductsBtn.addEventListener('click', async () => {
+                await stopMainScanner();
+                renderProductManagementList();
+                productModal.classList.remove('hidden');
+            });
+
+            closeModalBtn.addEventListener('click', closeModal);
+            productModal.addEventListener('click', (e) => {
+                if (e.target === productModal) closeModal();
+            });
+
+            scanBarcodeInFormBtn.addEventListener('click', () => {
+                formScanMode = 'add';
+                startFormScanner();
+            });
+
+            findByScanBtn.addEventListener('click', () => {
+                formScanMode = 'edit';
+                startFormScanner();
+            });
+            
+            closeFormScannerBtn.addEventListener('click', stopFormScanner);
+            
+            modalConfirmBtn.addEventListener('click', () => {
+                if (confirmCallback) {
+                    confirmCallback();
+                }
+                hideConfirmationModal();
+            });
+            modalCancelBtn.addEventListener('click', hideConfirmationModal);
+
+            productForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const barcode = barcodeInput.value.trim(); 
+                const name = nameInput.value.trim(); 
+                const price = parseFloat(priceInput.value); 
+                const originalBC = originalBarcode.value;
+                if (!barcode || !name || isNaN(price)) { 
+                    showConfirmationModal('Lütfen tüm alanları doğru doldurun.', null, true);
+                    return; 
+                }
+                
+                if (originalBC && originalBC !== barcode) {
+                    await deleteDoc(doc(productCollectionRef, originalBC));
+                }
+
+                if (!originalBC && productDatabase[barcode]) {
+                    showConfirmationModal('Bu barkod zaten kayıtlı!', null, true);
+                    return;
+                }
+                
+                const productData = { name, price };
+                await setDoc(doc(productCollectionRef, barcode), productData);
+                resetProductForm();
+            });
+
+            productManagementList.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-btn'); 
+                const deleteBtn = e.target.closest('.delete-btn');
+                if (editBtn) { 
+                    const barcode = editBtn.dataset.barcode; 
+                    const item = productDatabase[barcode]; 
+                    populateFormForEditing(barcode, item); 
+                }
+                if (deleteBtn) { 
+                    const barcode = deleteBtn.dataset.barcode;
+                    showConfirmationModal(`'${productDatabase[barcode].name}' ürününü silmek istediğinize emin misiniz?`, async () => {
+                         await deleteDoc(doc(productCollectionRef, barcode));
+                    });
+                }
+            });
+            formCancelBtn.addEventListener('click', resetProductForm);
+
             scannedItemsList.addEventListener('click', (event) => {
                 const quantityButton = event.target.closest('.quantity-btn');
                 if (quantityButton) {
@@ -495,63 +512,25 @@
                 }
             });
 
-            // --- Initialization ---
             resetButton.addEventListener('click', resetScanner);
             updateCartUI();
-            startMainScanner();
-        });
-
-        // --- Firebase Authentication and Data Loading ---
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                console.log("Kullanıcı giriş yaptı, UID:", user.uid);
-                const userId = user.uid;
-                productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
-
-                listenForProductChanges();
-            } else {
-                console.log("Kullanıcı çıkış yaptı. Anonim olarak giriş yapılıyor.");
-                signInAnonymously(auth).catch(error => {
-                    console.error("Anonim giriş hatası:", error);
-                });
-            }
-        });
-
-        async function listenForProductChanges() {
-            const initialSnapshot = await getDocs(productCollectionRef);
-            if (initialSnapshot.empty) {
-                console.log("Ürün bulunamadı. Varsayılan veriler yükleniyor.");
-                await populateDefaultProducts();
-            }
-
-            if(unsubscribeProducts) unsubscribeProducts();
             
-            unsubscribeProducts = onSnapshot(productCollectionRef, (snapshot) => {
-                const newDb = {};
-                snapshot.forEach(doc => {
-                    newDb[doc.id] = doc.data();
-                });
-                productDatabase = newDb;
-                console.log("Ürün veritabanı Firestore'dan güncellendi.");
-
-                if (!document.getElementById('product-modal').classList.contains('hidden')) {
-                    renderProductManagementList();
+            // Start main scanner after auth is ready
+            onAuthStateChanged(auth, user => {
+                if (user) {
+                    console.log("Kullanıcı giriş yaptı, UID:", user.uid);
+                    const userId = user.uid;
+                    productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
+                    listenForProductChanges();
+                    startMainScanner(); // Start camera only after user is authenticated
+                } else {
+                    console.log("Kullanıcı çıkış yaptı. Anonim olarak giriş yapılıyor.");
+                    signInAnonymously(auth).catch(error => {
+                        console.error("Anonim giriş hatası:", error);
+                    });
                 }
             });
-        }
-        
-        async function populateDefaultProducts() {
-            const defaultDB = {
-                '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 }, '8690504012177': { name: 'Eti Canga 45g', price: 9.75 }, '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 }, '8690987654321': { name: 'Pınar Süt 1L', price: 38.50 }, '8681234567890': { name: 'Saka Su 0.5L', price: 5.00 },
-            };
-            const batch = writeBatch(db);
-            Object.keys(defaultDB).forEach(barcode => {
-                const docRef = doc(productCollectionRef, barcode);
-                batch.set(docRef, defaultDB[barcode]);
-            });
-            await batch.commit();
-        }
-
+        });
     </script>
 </body>
 </html>
