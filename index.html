@@ -159,7 +159,6 @@
         import { getFirestore, doc, getDocs, setDoc, deleteDoc, onSnapshot, collection, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Initialization ---
-        // This configuration uses the new, restricted API key.
         const firebaseConfig = {
           apiKey: "AIzaSyA4ngudVTE3rCKerRinAIK7oD8UqT_bNC4",
           authDomain: "karalimedia-1d72f.firebaseapp.com",
@@ -315,10 +314,24 @@
             const formScanner = new Html5Qrcode("form-qr-reader");
             let isMainScannerActive = false;
             
+            // NEW: Robust configuration for scanners, especially for iOS compatibility.
+            const scannerConfig = {
+                fps: 10,
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    let qrboxSize = Math.floor(minEdge * 0.7);
+                    return {
+                        width: qrboxSize,
+                        height: qrboxSize,
+                    };
+                },
+                rememberLastUsedCamera: true,
+            };
+            
             async function startMainScanner() {
                 if (isMainScannerActive) return;
                 try {
-                    await mainScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onMainScanSuccess, () => {});
+                    await mainScanner.start({ facingMode: "environment" }, scannerConfig, onMainScanSuccess, () => {});
                     isMainScannerActive = true;
                     scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
                 } catch (err) { scannerStatusElement.textContent = 'Ana kamera başlatılamadı!'; }
@@ -333,7 +346,7 @@
             async function startFormScanner() {
                 formScannerContainer.classList.remove('hidden');
                 try {
-                    await formScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onFormScanSuccess, () => {});
+                    await formScanner.start({ facingMode: "environment" }, scannerConfig, onFormScanSuccess, () => {});
                 } catch (err) {
                     showConfirmationModal('Kamera başlatılamadı. Lütfen kamera izinlerini kontrol edin.', null, true);
                     formScannerContainer.classList.add('hidden');
