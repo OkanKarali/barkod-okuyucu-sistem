@@ -314,7 +314,7 @@
             const formScanner = new Html5Qrcode("form-qr-reader");
             let isMainScannerActive = false;
             
-            // NEW: Robust configuration for scanners, especially for iOS compatibility.
+            // IOS COMPATIBILITY FIX: New robust configuration for scanners.
             const scannerConfig = {
                 fps: 10,
                 qrbox: (viewfinderWidth, viewfinderHeight) => {
@@ -326,6 +326,16 @@
                     };
                 },
                 rememberLastUsedCamera: true,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                },
+                formatsToSupport: [
+                    Html5Qrcode.getSupportedFormats().EAN_13,
+                    Html5Qrcode.getSupportedFormats().EAN_8,
+                    Html5Qrcode.getSupportedFormats().CODE_128,
+                    Html5Qrcode.getSupportedFormats().UPC_A,
+                    Html5Qrcode.getSupportedFormats().UPC_E
+                ]
             };
             
             async function startMainScanner() {
