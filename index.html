@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barkod Okuyucu Kasa Sistemi</title>
+    <title>Barkod Okuyucu Kasa Sistemi - Firebase</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts: Inter -->
@@ -31,6 +31,13 @@
         .action-button:hover svg {
             transform: scale(1.1);
         }
+        /* Custom Modal Styles */
+        .modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4">
@@ -40,8 +47,8 @@
         
         <div class="text-center relative">
              <button id="manage-products-btn" class="absolute top-0 left-0 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-3 rounded-lg text-sm transition-colors">
-                Ürünleri Yönet
-            </button>
+                 Ürünleri Yönet
+             </button>
             <h1 class="text-2xl font-bold text-slate-800 pt-12 sm:pt-0">Barkod Okuyucu Kasa</h1>
             <p class="text-sm text-slate-500 mt-1">Ürün barkodunu okutarak listeye ekleyin.</p>
         </div>
@@ -129,26 +136,42 @@
             </div>
         </div>
     </div>
+    
+    <!-- Custom Confirmation Modal -->
+    <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-60 modal-backdrop flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm modal-content transform scale-95">
+            <div class="p-6 text-center">
+                <h3 id="modal-title" class="text-lg font-semibold text-slate-800 mb-2">Onay</h3>
+                <p id="modal-message" class="text-slate-600 mb-6">Bu işlemi yapmak istediğinizden emin misiniz?</p>
+                <div class="flex justify-center space-x-4">
+                    <button id="modal-confirm-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">Evet</button>
+                    <button id="modal-cancel-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg transition-colors">Hayır</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <script>
+
+    <script type="module">
+        // Import Firebase services
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDocs, setDoc, deleteDoc, onSnapshot, collection, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Initialization ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'barcode-pos-default';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        let productDatabase = {};
+        let productCollectionRef; // Will be set after auth
+        let unsubscribeProducts; // To stop the real-time listener
+
         document.addEventListener('DOMContentLoaded', () => {
-            const DB_STORAGE_KEY = 'barcodeScannerProducts';
 
-            // --- LocalStorage Functions ---
-            function loadProductDatabase() {
-                const savedDB = localStorage.getItem(DB_STORAGE_KEY);
-                if (savedDB) return JSON.parse(savedDB);
-                const defaultDB = {
-                    '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 }, '8690504012177': { name: 'Eti Canga 45g', price: 9.75 }, '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 }, '8690987654321': { name: 'Pınar Süt 1L', price: 38.50 }, '8681234567890': { name: 'Saka Su 0.5L', price: 5.00 }, '8690526000018': { name: 'Tadım Ay Çekirdeği', price: 25.00 }, '8697404547012': { name: 'Fuse Tea Şeftali 1L', price: 28.90 }, '5000112664553': { name: 'Coca Cola 2.5lt', price: 75.00 }, '5000112672039': { name: 'Coca Cola 1.5lt', price: 65.00 },
-                };
-                localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(defaultDB));
-                return defaultDB;
-            }
-            function saveProductDatabase() {
-                localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(productDatabase));
-            }
-
-            let productDatabase = loadProductDatabase();
             let cart = {};
             let lastScanTime = 0;
             let formScanMode = 'add'; // 'add' or 'edit'
@@ -170,12 +193,17 @@
             const formScannerContainer = document.getElementById('form-scanner-container');
             const closeFormScannerBtn = document.getElementById('close-form-scanner-btn');
             const findByScanBtn = document.getElementById('find-by-scan-btn');
-            // Main page elements
             const scannedItemsList = document.getElementById('scanned-items-list');
             const totalPriceElement = document.getElementById('total-price');
             const scanResultElement = document.getElementById('scan-result');
             const scannerStatusElement = document.getElementById('scanner-status');
             const resetButton = document.getElementById('reset-button');
+            // Modal elements
+            const confirmationModal = document.getElementById('confirmation-modal');
+            const modalMessage = document.getElementById('modal-message');
+            const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+            const modalCancelBtn = document.getElementById('modal-cancel-btn');
+            let confirmCallback = null;
             
 
             // --- Scanner Instances ---
@@ -204,7 +232,7 @@
                 try {
                     await formScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onFormScanSuccess, () => {});
                 } catch (err) {
-                    alert('Kamera başlatılamadı. Lütfen kamera izinlerini kontrol edin.');
+                    showConfirmationModal('Kamera başlatılamadı. Lütfen kamera izinlerini kontrol edin.', null, true);
                     formScannerContainer.classList.add('hidden');
                 }
             }
@@ -218,7 +246,7 @@
             
             // --- Success Callbacks ---
             function onMainScanSuccess(decodedText) {
-                if (Date.now() - lastScanTime < 2000) return;
+                if (Date.now() - lastScanTime < 2000) return; // Debounce scans
                 lastScanTime = Date.now();
                 const productInfo = productDatabase[decodedText];
                 if (productInfo) {
@@ -243,13 +271,50 @@
                     if (item) {
                         populateFormForEditing(decodedText, item);
                     } else {
-                        alert(`Ürün bulunamadı: ${decodedText}\n\nYeni ürün olarak ekleyebilirsiniz.`);
-                        resetProductForm();
-                        barcodeInput.value = decodedText;
-                        nameInput.focus();
+                        showConfirmationModal(`'${decodedText}' barkodlu ürün bulunamadı. Yeni ürün olarak eklemek ister misiniz?`, () => {
+                             resetProductForm();
+                             barcodeInput.value = decodedText;
+                             nameInput.focus();
+                        });
                     }
                 }
             }
+            
+            // --- Custom Modal Logic ---
+            function showConfirmationModal(message, onConfirm, isAlert = false) {
+                modalMessage.textContent = message;
+                confirmCallback = onConfirm;
+                if (isAlert) {
+                    modalConfirmBtn.textContent = "Tamam";
+                    modalCancelBtn.classList.add('hidden');
+                } else {
+                    modalConfirmBtn.textContent = "Evet";
+                    modalCancelBtn.classList.remove('hidden');
+                }
+                confirmationModal.classList.remove('hidden');
+                setTimeout(() => {
+                    confirmationModal.querySelector('.modal-backdrop').classList.remove('opacity-0');
+                    confirmationModal.querySelector('.modal-content').classList.remove('scale-95');
+                }, 10);
+            }
+
+            function hideConfirmationModal() {
+                 confirmationModal.querySelector('.modal-backdrop').classList.add('opacity-0');
+                 confirmationModal.querySelector('.modal-content').classList.add('scale-95');
+                 setTimeout(() => {
+                    confirmationModal.classList.add('hidden');
+                    confirmCallback = null;
+                 }, 300);
+            }
+
+            modalConfirmBtn.addEventListener('click', () => {
+                if (confirmCallback) {
+                    confirmCallback();
+                }
+                hideConfirmationModal();
+            });
+            modalCancelBtn.addEventListener('click', hideConfirmationModal);
+
 
             // --- Modal & Form Logic ---
             manageProductsBtn.addEventListener('click', async () => {
@@ -297,6 +362,10 @@
 
             function renderProductManagementList() {
                 productManagementList.innerHTML = '';
+                 if (Object.keys(productDatabase).length === 0) {
+                    productManagementList.innerHTML = `<p class="text-slate-500 text-center py-4">Veritabanında ürün bulunmuyor.</p>`;
+                    return;
+                }
                 Object.keys(productDatabase).sort().forEach(barcode => {
                     const item = productDatabase[barcode];
                     const div = document.createElement('div');
@@ -320,31 +389,77 @@
                 formCancelBtn.classList.add('hidden');
             }
 
-            productForm.addEventListener('submit', (e) => {
+            productForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const barcode = barcodeInput.value.trim(); const name = nameInput.value.trim(); const price = parseFloat(priceInput.value); const originalBC = originalBarcode.value;
-                if (!barcode || !name || isNaN(price)) { alert('Lütfen tüm alanları doğru doldurun.'); return; }
-                if (originalBC) { if (originalBC !== barcode) delete productDatabase[originalBC]; productDatabase[barcode] = { name, price }; } 
-                else { if (productDatabase[barcode]) { alert('Bu barkod zaten kayıtlı!'); return; } productDatabase[barcode] = { name, price }; }
-                saveProductDatabase(); renderProductManagementList(); resetProductForm();
+                const barcode = barcodeInput.value.trim(); 
+                const name = nameInput.value.trim(); 
+                const price = parseFloat(priceInput.value); 
+                const originalBC = originalBarcode.value;
+                if (!barcode || !name || isNaN(price)) { 
+                    showConfirmationModal('Lütfen tüm alanları doğru doldurun.', null, true);
+                    return; 
+                }
+                
+                // If originalBC exists, we are in edit mode
+                if (originalBC && originalBC !== barcode) {
+                    // Barcode has changed, so delete the old one and add a new one
+                    await deleteDoc(doc(productCollectionRef, originalBC));
+                }
+
+                if (!originalBC && productDatabase[barcode]) {
+                    showConfirmationModal('Bu barkod zaten kayıtlı!', null, true);
+                    return;
+                }
+                
+                // Add or update the product
+                const productData = { name, price };
+                await setDoc(doc(productCollectionRef, barcode), productData);
+                
+                resetProductForm();
             });
 
             productManagementList.addEventListener('click', (e) => {
-                const editBtn = e.target.closest('.edit-btn'); const deleteBtn = e.target.closest('.delete-btn');
-                if (editBtn) { const barcode = editBtn.dataset.barcode; const item = productDatabase[barcode]; populateFormForEditing(barcode, item); }
-                if (deleteBtn) { const barcode = deleteBtn.dataset.barcode; if (confirm(`'${productDatabase[barcode].name}' ürününü silmek istediğinize emin misiniz?`)) { delete productDatabase[barcode]; saveProductDatabase(); renderProductManagementList(); } }
+                const editBtn = e.target.closest('.edit-btn'); 
+                const deleteBtn = e.target.closest('.delete-btn');
+                if (editBtn) { 
+                    const barcode = editBtn.dataset.barcode; 
+                    const item = productDatabase[barcode]; 
+                    populateFormForEditing(barcode, item); 
+                }
+                if (deleteBtn) { 
+                    const barcode = deleteBtn.dataset.barcode;
+                    showConfirmationModal(`'${productDatabase[barcode].name}' ürününü silmek istediğinize emin misiniz?`, async () => {
+                         await deleteDoc(doc(productCollectionRef, barcode));
+                    });
+                }
             });
             formCancelBtn.addEventListener('click', resetProductForm);
 
             // --- Cart Logic ---
             function updateCartUI() {
                 scannedItemsList.innerHTML = '';
-                if (Object.keys(cart).length === 0) { scannedItemsList.innerHTML = '<p id="empty-cart-message" class="text-slate-500 text-center">Henüz ürün okutulmadı.</p>'; } 
-                else {
+                if (Object.keys(cart).length === 0) { 
+                    scannedItemsList.innerHTML = '<p id="empty-cart-message" class="text-slate-500 text-center">Henüz ürün okutulmadı.</p>'; 
+                } else {
                     Object.keys(cart).forEach(barcode => {
-                        const item = cart[barcode]; const listItem = document.createElement('div'); listItem.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
+                        const item = cart[barcode]; 
+                        const listItem = document.createElement('div'); 
+                        listItem.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
                         if (item.isNew) { listItem.classList.add('highlight-item'); delete item.isNew; }
-                        listItem.innerHTML = `<span class="text-slate-800">${item.name} (x${item.quantity})</span> <div class="flex items-center space-x-4"> <span class="font-semibold text-slate-600">${(item.price * item.quantity).toFixed(2)} TL</span> <button data-barcode="${barcode}" class="remove-from-cart-btn action-button text-red-400 hover:text-red-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button> </div>`;
+                        
+                        listItem.innerHTML = `
+                            <div class="flex-1 min-w-0 pr-2">
+                                <p class="font-medium text-slate-800 truncate">${item.name}</p>
+                                <p class="text-sm text-slate-500">${item.price.toFixed(2)} TL / adet</p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button data-barcode="${barcode}" data-change="-1" class="quantity-btn bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold w-7 h-7 rounded-full flex items-center justify-center transition-colors">-</button>
+                                <span class="font-semibold w-5 text-center">${item.quantity}</span>
+                                <button data-barcode="${barcode}" data-change="1" class="quantity-btn bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold w-7 h-7 rounded-full flex items-center justify-center transition-colors">+</button>
+                            </div>
+                            <div class="w-24 text-right font-bold text-slate-800">
+                                <span>${(item.price * item.quantity).toFixed(2)} TL</span>
+                            </div>`;
                         scannedItemsList.appendChild(listItem);
                     });
                     scannedItemsList.scrollTop = scannedItemsList.scrollHeight;
@@ -352,10 +467,23 @@
                 const total = Object.values(cart).reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 totalPriceElement.textContent = `${total.toFixed(2)} TL`;
             }
+
             function resetScanner() { cart = {}; scanResultElement.textContent = 'Liste temizlendi. Yeni tarama yapabilirsiniz.'; updateCartUI(); }
+            
             scannedItemsList.addEventListener('click', (event) => {
-                const removeButton = event.target.closest('.remove-from-cart-btn');
-                if (removeButton) { const barcodeToDelete = removeButton.dataset.barcode; if (cart[barcodeToDelete]) { delete cart[barcodeToDelete]; updateCartUI(); } }
+                const quantityButton = event.target.closest('.quantity-btn');
+                if (quantityButton) {
+                    const barcode = quantityButton.dataset.barcode;
+                    const change = parseInt(quantityButton.dataset.change, 10);
+                    
+                    if (cart[barcode]) {
+                        cart[barcode].quantity += change;
+                        if (cart[barcode].quantity <= 0) {
+                            delete cart[barcode];
+                        }
+                        updateCartUI();
+                    }
+                }
             });
 
             // --- Initialization ---
@@ -363,6 +491,102 @@
             updateCartUI();
             startMainScanner();
         });
+
+        // --- Firebase Authentication and Data Loading ---
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                console.log("User is signed in with UID:", user.uid);
+                const userId = user.uid;
+                // Path: /artifacts/{appId}/users/{userId}/products
+                productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
+
+                // Start real-time listener
+                listenForProductChanges();
+            } else {
+                console.log("User is signed out. Attempting to sign in.");
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) {
+                    signInWithCustomToken(auth, token).catch(error => {
+                        console.error("Error signing in with custom token:", error);
+                        signInAnonymously(auth); // Fallback to anonymous
+                    });
+                } else {
+                    signInAnonymously(auth).catch(error => {
+                        console.error("Error signing in anonymously:", error);
+                    });
+                }
+            }
+        });
+
+        async function listenForProductChanges() {
+            // First, check if there are any products. If not, add defaults.
+            const initialSnapshot = await getDocs(productCollectionRef);
+            if (initialSnapshot.empty) {
+                console.log("No products found. Populating with default data.");
+                await populateDefaultProducts();
+            }
+
+            // Now, attach the real-time listener
+            if(unsubscribeProducts) unsubscribeProducts(); // Detach any old listener
+            
+            unsubscribeProducts = onSnapshot(productCollectionRef, (snapshot) => {
+                const newDb = {};
+                snapshot.forEach(doc => {
+                    newDb[doc.id] = doc.data();
+                });
+                productDatabase = newDb;
+                console.log("Product database updated from Firestore.");
+
+                // If modal is open, re-render its list
+                if (!document.getElementById('product-modal').classList.contains('hidden')) {
+                    document.getElementById('product-management-list').innerHTML = ''; // Clear old list
+                    Object.keys(productDatabase).sort().forEach(barcode => {
+                        const item = productDatabase[barcode];
+                        const div = document.createElement('div');
+                        div.className = 'flex justify-between items-center bg-slate-50 p-2 rounded-md';
+                        div.innerHTML = `...`; // Re-rendering logic here
+                    });
+                    const listElement = document.getElementById('product-management-list');
+                    if (listElement) renderProductManagementListInModal(listElement);
+                }
+            });
+        }
+        
+        function renderProductManagementListInModal(listElement) {
+             listElement.innerHTML = '';
+             if (Object.keys(productDatabase).length === 0) {
+                 listElement.innerHTML = `<p class="text-slate-500 text-center py-4">Veritabanında ürün bulunmuyor.</p>`;
+                 return;
+             }
+             Object.keys(productDatabase).sort().forEach(barcode => {
+                 const item = productDatabase[barcode];
+                 const div = document.createElement('div');
+                 div.className = 'flex justify-between items-center bg-slate-50 p-2 rounded-md';
+                 div.innerHTML = `
+                     <div class="flex-1 min-w-0">
+                         <p class="font-semibold text-slate-800 truncate">${item.name}</p>
+                         <p class="text-sm text-slate-500 truncate">Barkod: ${barcode} - Fiyat: ${item.price.toFixed(2)} TL</p>
+                     </div>
+                     <div class="flex space-x-2 flex-shrink-0">
+                         <button data-barcode="${barcode}" class="edit-btn action-button text-blue-500 hover:text-blue-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                         <button data-barcode="${barcode}" class="delete-btn action-button text-red-500 hover:text-red-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                     </div>`;
+                 listElement.appendChild(div);
+             });
+        }
+        
+        async function populateDefaultProducts() {
+            const defaultDB = {
+                '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 }, '8690504012177': { name: 'Eti Canga 45g', price: 9.75 }, '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 }, '8690987654321': { name: 'Pınar Süt 1L', price: 38.50 }, '8681234567890': { name: 'Saka Su 0.5L', price: 5.00 }, '8690526000018': { name: 'Tadım Ay Çekirdeği', price: 25.00 }, '8697404547012': { name: 'Fuse Tea Şeftali 1L', price: 28.90 }, '5000112664553': { name: 'Coca Cola 2.5lt', price: 75.00 }, '5000112672039': { name: 'Coca Cola 1.5lt', price: 65.00 },
+            };
+            const batch = writeBatch(db);
+            Object.keys(defaultDB).forEach(barcode => {
+                const docRef = doc(productCollectionRef, barcode);
+                batch.set(docRef, defaultDB[barcode]);
+            });
+            await batch.commit();
+        }
+
     </script>
 </body>
 </html>
