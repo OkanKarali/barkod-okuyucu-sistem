@@ -16,13 +16,11 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Style for the scanner region border */
         #qr-reader-region {
             border: 2px solid #3b82f6;
             border-radius: 8px;
             overflow: hidden;
         }
-        /* Custom animation for highlighting found items */
         @keyframes highlight {
             0% { background-color: #dbeafe; } /* blue-100 */
             100% { background-color: transparent; }
@@ -30,30 +28,29 @@
         .highlight-item {
             animation: highlight 1.5s ease-out;
         }
+        .delete-button:hover svg {
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
 
     <div class="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-6 space-y-6">
         
-        <!-- Header -->
         <div class="text-center">
             <h1 class="text-2xl font-bold text-slate-800">Barkod Okuyucu Kasa</h1>
             <p class="text-sm text-slate-500 mt-1">Ürün barkodunu okutarak listeye ekleyin.</p>
         </div>
 
-        <!-- Barcode Scanner Area -->
         <div id="scanner-container" class="bg-slate-200 rounded-lg p-2">
             <div id="qr-reader" class="w-full"></div>
             <p id="scanner-status" class="text-center text-sm text-slate-600 mt-2">Kamera başlatılıyor...</p>
         </div>
         
-        <!-- Last Scanned Result -->
         <div id="scan-result-container" class="h-12 flex items-center justify-center bg-gray-50 rounded-lg transition-all duration-300">
              <p id="scan-result" class="text-center text-slate-700 font-medium">Kamerayı bir barkoda doğrultun</p>
         </div>
 
-        <!-- Scanned Items (Shopping Cart) -->
         <div>
             <h2 class="text-lg font-semibold text-slate-700 mb-2">Okutulan Ürünler</h2>
             <div id="scanned-items-list" class="space-y-2 max-h-60 overflow-y-auto bg-slate-50 p-3 rounded-lg border">
@@ -61,7 +58,6 @@
             </div>
         </div>
 
-        <!-- Total Price and Reset Button -->
         <div class="border-t pt-4 space-y-4">
             <div class="flex justify-between items-center">
                 <span class="text-xl font-bold text-slate-800">TOPLAM:</span>
@@ -78,8 +74,6 @@
         document.addEventListener('DOMContentLoaded', () => {
 
             // --- Product Database ---
-            // In a real application, this data would come from a server/API.
-            // For this demo, we use a simple JavaScript object.
             const productDatabase = {
                 '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 },
                 '8690504012177': { name: 'Eti Canga 45g', price: 9.75 },
@@ -93,7 +87,8 @@
             };
 
             // --- Application State ---
-            let scannedItems = [];
+            // We use an object to store cart items to easily manage quantities.
+            let cart = {}; 
             let lastScanTime = 0;
 
             // --- DOM Element References ---
@@ -107,72 +102,88 @@
             // --- Main Functions ---
 
             /**
-             * Updates the UI based on the current state of scannedItems.
-             * It re-renders the list and recalculates the total price.
+             * Updates the UI based on the current cart state.
+             * It re-renders the list, shows quantities, adds delete buttons, and recalculates the total.
              */
             function updateCartUI() {
-                // Clear the current list
                 scannedItemsList.innerHTML = '';
 
-                if (scannedItems.length === 0) {
+                if (Object.keys(cart).length === 0) {
                     scannedItemsList.appendChild(emptyCartMessage);
                     emptyCartMessage.style.display = 'block';
                 } else {
                     emptyCartMessage.style.display = 'none';
-                    let currentTotal = 0;
                     
-                    scannedItems.forEach(item => {
-                        // Create a new list item element
+                    for (const barcode in cart) {
+                        const item = cart[barcode];
                         const listItem = document.createElement('div');
-                        listItem.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm highlight-item';
+                        listItem.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
+                        // Add highlight animation only to the last added item.
+                        if (item.isNew) {
+                           listItem.classList.add('highlight-item');
+                           delete item.isNew; // Remove the flag after applying animation
+                        }
                         
-                        const itemName = document.createElement('span');
-                        itemName.className = 'text-slate-800';
-                        itemName.textContent = item.name;
+                        // Item Name and Quantity
+                        const nameAndQty = document.createElement('span');
+                        nameAndQty.className = 'text-slate-800';
+                        nameAndQty.textContent = `${item.name} (x${item.quantity})`;
+                        
+                        // Item Price and Delete Button
+                        const priceAndButton = document.createElement('div');
+                        priceAndButton.className = 'flex items-center space-x-4';
 
                         const itemPrice = document.createElement('span');
                         itemPrice.className = 'font-semibold text-slate-600';
-                        itemPrice.textContent = `${item.price.toFixed(2)} TL`;
+                        itemPrice.textContent = `${(item.price * item.quantity).toFixed(2)} TL`;
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'delete-button text-red-400 hover:text-red-600 transition-colors';
+                        deleteBtn.setAttribute('data-barcode', barcode);
+                        deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`;
+
+                        priceAndButton.appendChild(itemPrice);
+                        priceAndButton.appendChild(deleteBtn);
                         
-                        listItem.appendChild(itemName);
-                        listItem.appendChild(itemPrice);
+                        listItem.appendChild(nameAndQty);
+                        listItem.appendChild(priceAndButton);
                         
                         scannedItemsList.appendChild(listItem);
-
-                        // Add to total
-                        currentTotal += item.price;
-                    });
-
-                     // Scroll to the bottom of the list
+                    }
                     scannedItemsList.scrollTop = scannedItemsList.scrollHeight;
                 }
                 
                 // Update total price display
-                const total = scannedItems.reduce((sum, item) => sum + item.price, 0);
+                const total = Object.values(cart).reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 totalPriceElement.textContent = `${total.toFixed(2)} TL`;
             }
             
             /**
              * Handles successful barcode scans.
-             * @param {string} decodedText - The decoded barcode number.
-             * @param {object} decodedResult - Detailed result object from the library.
              */
             function onScanSuccess(decodedText, decodedResult) {
-                // To prevent multiple rapid scans of the same item
                 const now = Date.now();
-                if (now - lastScanTime < 2000) { // 2 second cooldown
-                    return;
-                }
+                if (now - lastScanTime < 2000) { return; }
                 lastScanTime = now;
 
-                const product = productDatabase[decodedText];
+                const productInfo = productDatabase[decodedText];
 
-                if (product) {
-                    scanResultElement.textContent = `Bulundu: ${product.name}`;
+                if (productInfo) {
+                    scanResultElement.textContent = `Eklendi: ${productInfo.name}`;
                     scanResultElement.parentElement.classList.add('bg-green-100');
                     scanResultElement.parentElement.classList.remove('bg-red-100');
                     
-                    scannedItems.push(product);
+                    // If item is already in cart, increase quantity. Otherwise, add it.
+                    if (cart[decodedText]) {
+                        cart[decodedText].quantity++;
+                    } else {
+                        cart[decodedText] = {
+                            ...productInfo,
+                            quantity: 1,
+                            isNew: true // Flag to trigger animation
+                        };
+                    }
+                    
                     updateCartUI();
 
                 } else {
@@ -181,57 +192,54 @@
                     scanResultElement.parentElement.classList.remove('bg-green-100');
                 }
 
-                // Reset the result message style after a short delay
                 setTimeout(() => {
                     scanResultElement.parentElement.classList.remove('bg-green-100', 'bg-red-100');
                 }, 1500);
             }
 
-            /**
-             * Handles scan failures (not used in this logic but required by the library).
-             * @param {string} error - The error message.
-             */
-            function onScanFailure(error) {
-                // This function is called frequently, so we keep it quiet.
-                // You can uncomment the line below for debugging.
-                // console.warn(`Code scan error = ${error}`);
-            }
+            function onScanFailure(error) { /* Be quiet on failure */ }
             
             /**
-             * Resets the application to its initial state.
+             * Resets the cart to its initial state.
              */
             function resetScanner() {
-                scannedItems = [];
+                cart = {};
                 scanResultElement.textContent = 'Liste temizlendi. Yeni tarama yapabilirsiniz.';
                 updateCartUI();
             }
 
+            /**
+             * Handles clicks on the delete buttons using event delegation.
+             */
+            function handleCartClick(event) {
+                const deleteButton = event.target.closest('.delete-button');
+                if (deleteButton) {
+                    const barcodeToDelete = deleteButton.dataset.barcode;
+                    if (cart[barcodeToDelete]) {
+                        delete cart[barcodeToDelete];
+                        updateCartUI();
+                    }
+                }
+            }
+
 
             // --- Initialization ---
-
-            // Create a new scanner instance
             const html5QrCode = new Html5Qrcode("qr-reader");
             const config = { fps: 10, qrbox: { width: 250, height: 150 } };
 
-            // Start the scanner
             html5QrCode.start(
-                { facingMode: "environment" }, // Use the back camera
-                config,
-                onScanSuccess,
-                onScanFailure
+                { facingMode: "environment" }, config, onScanSuccess, onScanFailure
             ).then(() => {
                 scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
                 document.getElementById('qr-reader-region').style.borderStyle = 'solid';
             }).catch(err => {
                 scannerStatusElement.textContent = 'Kamera başlatılamadı! Lütfen izinleri kontrol edin.';
                 scannerStatusElement.classList.add('text-red-600', 'font-semibold');
-                console.error("Kamera başlatma hatası:", err);
             });
 
-            // Add event listener for the reset button
             resetButton.addEventListener('click', resetScanner);
+            scannedItemsList.addEventListener('click', handleCartClick);
             
-            // Initial UI update
             updateCartUI();
         });
     </script>
