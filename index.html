@@ -275,7 +275,8 @@
         }
 
         // --- Firebase Data Functions ---
-        async function listenForProductChanges() {
+        async function listenForProductChanges(userId) {
+            productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
             const initialSnapshot = await getDocs(productCollectionRef);
             if (initialSnapshot.empty) {
                 console.log("Ürün bulunamadı. Varsayılan veriler yükleniyor.");
@@ -327,20 +328,29 @@
                 qrbox: { width: 250, height: 150 },
                 rememberLastUsedCamera: true
             };
-            const videoConstraints = { facingMode: { ideal: "environment" } };
             
             async function startMainScanner() {
                 if (isMainScannerActive) return;
                 
                 startCameraPrompt.classList.add('hidden');
                 qrReaderDiv.classList.remove('hidden');
-                scannerStatusElement.textContent = 'Kamera başlatılıyor...';
+                scannerStatusElement.textContent = 'Kamera izni isteniyor...';
 
                 try {
-                    await mainScanner.start(videoConstraints, scannerConfig, onMainScanSuccess, () => {});
-                    isMainScannerActive = true;
-                    scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
+                    const cameras = await Html5Qrcode.getCameras();
+                    if (cameras && cameras.length) {
+                        const cameraId = cameras.find(c => c.label.toLowerCase().includes('back'))?.id || cameras[0].id;
+                        scannerStatusElement.textContent = 'Kamera başlatılıyor...';
+                        await mainScanner.start(cameraId, scannerConfig, onMainScanSuccess, () => {});
+                        isMainScannerActive = true;
+                        scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
+                    } else {
+                        scannerStatusElement.textContent = 'Kamera bulunamadı.';
+                        startCameraPrompt.classList.remove('hidden');
+                        qrReaderDiv.classList.add('hidden');
+                    }
                 } catch (err) { 
+                    console.error("Kamera başlatma hatası:", err);
                     scannerStatusElement.textContent = 'Kamera başlatılamadı!'; 
                     startCameraPrompt.classList.remove('hidden');
                     qrReaderDiv.classList.add('hidden');
@@ -361,7 +371,14 @@
             async function startFormScanner() {
                 formScannerContainer.classList.remove('hidden');
                 try {
-                    await formScanner.start(videoConstraints, scannerConfig, onFormScanSuccess, () => {});
+                    const cameras = await Html5Qrcode.getCameras();
+                    if (cameras && cameras.length) {
+                         const cameraId = cameras.find(c => c.label.toLowerCase().includes('back'))?.id || cameras[0].id;
+                         await formScanner.start(cameraId, scannerConfig, onFormScanSuccess, () => {});
+                    } else {
+                         showConfirmationModal('Kamera bulunamadı.', null, true);
+                         formScannerContainer.classList.add('hidden');
+                    }
                 } catch (err) {
                     showConfirmationModal('Kamera başlatılamadı. Lütfen kamera izinlerini kontrol edin.', null, true);
                     formScannerContainer.classList.add('hidden');
