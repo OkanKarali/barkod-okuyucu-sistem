@@ -159,6 +159,7 @@
         import { getFirestore, doc, getDocs, setDoc, deleteDoc, onSnapshot, collection, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Initialization ---
+        // This configuration uses the new, restricted API key.
         const firebaseConfig = {
           apiKey: "AIzaSyA4ngudVTE3rCKerRinAIK7oD8UqT_bNC4",
           authDomain: "karalimedia-1d72f.firebaseapp.com",
@@ -314,41 +315,25 @@
             const formScanner = new Html5Qrcode("form-qr-reader");
             let isMainScannerActive = false;
             
-            const scannerConfig = {
-                fps: 10,
-                qrbox: { width: 250, height: 150 },
-                rememberLastUsedCamera: true
-            };
-            const videoConstraints = { facingMode: { ideal: "environment" } };
-            
             async function startMainScanner() {
                 if (isMainScannerActive) return;
-                
-                scannerStatusElement.textContent = 'Kamera başlatılıyor...';
-
                 try {
-                    await mainScanner.start(videoConstraints, scannerConfig, onMainScanSuccess, () => {});
+                    await mainScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onMainScanSuccess, () => {});
                     isMainScannerActive = true;
                     scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
-                } catch (err) { 
-                    console.error("Kamera başlatma hatası:", err);
-                    scannerStatusElement.textContent = 'Kamera başlatılamadı!'; 
-                }
+                } catch (err) { scannerStatusElement.textContent = 'Ana kamera başlatılamadı!'; }
             }
 
             async function stopMainScanner() {
                 if (!isMainScannerActive || mainScanner.getState() !== 2) return;
-                try { 
-                    await mainScanner.stop(); 
-                    isMainScannerActive = false; 
-                    scannerStatusElement.textContent = 'Kamera durduruldu.';
-                } catch (err) { console.error("Ana kamera durdurulamadı:", err); }
+                try { await mainScanner.stop(); isMainScannerActive = false; } 
+                catch (err) { console.error("Ana kamera durdurulamadı:", err); }
             }
 
             async function startFormScanner() {
                 formScannerContainer.classList.remove('hidden');
                 try {
-                    await formScanner.start(videoConstraints, scannerConfig, onFormScanSuccess, () => {});
+                    await formScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onFormScanSuccess, () => {});
                 } catch (err) {
                     showConfirmationModal('Kamera başlatılamadı. Lütfen kamera izinlerini kontrol edin.', null, true);
                     formScannerContainer.classList.add('hidden');
@@ -538,7 +523,7 @@
                     const userId = user.uid;
                     productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
                     listenForProductChanges();
-                    startMainScanner(); // Auto-start camera
+                    startMainScanner(); // Start camera only after user is authenticated
                 } else {
                     console.log("Kullanıcı çıkış yaptı. Anonim olarak giriş yapılıyor.");
                     signInAnonymously(auth).catch(error => {
