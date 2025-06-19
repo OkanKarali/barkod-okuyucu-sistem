@@ -16,7 +16,7 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        #qr-reader-region {
+        .scanner-region {
             border: 2px solid #3b82f6;
             border-radius: 8px;
             overflow: hidden;
@@ -38,7 +38,6 @@
     <!-- Main Application Card -->
     <div class="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-6 space-y-6">
         
-        <!-- Header & Product Management Button -->
         <div class="text-center relative">
              <button id="manage-products-btn" class="absolute top-0 left-0 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-3 rounded-lg text-sm transition-colors">
                 Ürünleri Yönet
@@ -47,9 +46,8 @@
             <p class="text-sm text-slate-500 mt-1">Ürün barkodunu okutarak listeye ekleyin.</p>
         </div>
 
-        <!-- Scanner -->
         <div id="scanner-container" class="bg-slate-200 rounded-lg p-2">
-            <div id="qr-reader" class="w-full"></div>
+            <div id="qr-reader" class="w-full scanner-region"></div>
             <p id="scanner-status" class="text-center text-sm text-slate-600 mt-2">Kamera başlatılıyor...</p>
         </div>
         
@@ -57,7 +55,6 @@
              <p id="scan-result" class="text-center text-slate-700 font-medium">Kamerayı bir barkoda doğrultun</p>
         </div>
 
-        <!-- Shopping Cart -->
         <div>
             <h2 class="text-lg font-semibold text-slate-700 mb-2">Okutulan Ürünler</h2>
             <div id="scanned-items-list" class="space-y-2 max-h-60 overflow-y-auto bg-slate-50 p-3 rounded-lg border">
@@ -65,7 +62,6 @@
             </div>
         </div>
 
-        <!-- Total -->
         <div class="border-t pt-4 space-y-4">
             <div class="flex justify-between items-center">
                 <span class="text-xl font-bold text-slate-800">TOPLAM:</span>
@@ -80,30 +76,35 @@
     <!-- Product Management Modal -->
     <div id="product-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <!-- Modal Header -->
             <div class="flex justify-between items-center p-4 border-b">
                 <h2 class="text-xl font-bold text-slate-800">Ürün Yönetimi</h2>
-                <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800">&times;</button>
+                <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
             </div>
 
-            <!-- Modal Body -->
             <div class="p-6 space-y-6 overflow-y-auto">
-                <!-- Product List -->
                 <div>
                     <h3 class="text-lg font-semibold text-slate-700 mb-2">Mevcut Ürünler</h3>
-                    <div id="product-management-list" class="space-y-2">
-                        <!-- Products will be dynamically inserted here -->
-                    </div>
+                    <div id="product-management-list" class="space-y-2"></div>
                 </div>
 
-                <!-- Add/Edit Form -->
+                <!-- Form Scanner Container -->
+                <div id="form-scanner-container" class="hidden bg-slate-200 rounded-lg p-2">
+                    <div id="form-qr-reader" class="w-full scanner-region"></div>
+                    <button id="close-form-scanner-btn" class="w-full mt-2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg">Kamerayı Kapat</button>
+                </div>
+
                 <div class="border-t pt-6">
                     <h3 id="form-title" class="text-lg font-semibold text-slate-700 mb-2">Yeni Ürün Ekle</h3>
                     <form id="product-form" class="space-y-4">
                         <input type="hidden" id="original-barcode-input">
                         <div>
                             <label for="barcode-input" class="block text-sm font-medium text-slate-600">Barkod</label>
-                            <input type="text" id="barcode-input" required class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <div class="flex items-center space-x-2 mt-1">
+                                <input type="text" id="barcode-input" required class="block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <button type="button" id="scan-barcode-in-form-btn" class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label for="name-input" class="block text-sm font-medium text-slate-600">Ürün Adı</label>
@@ -123,56 +124,29 @@
         </div>
     </div>
 
-
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-
             const DB_STORAGE_KEY = 'barcodeScannerProducts';
 
             // --- LocalStorage Functions ---
-            /**
-             * Loads the product database from localStorage. If not found, loads default data.
-             * @returns {object} The product database object.
-             */
             function loadProductDatabase() {
                 const savedDB = localStorage.getItem(DB_STORAGE_KEY);
-                if (savedDB) {
-                    return JSON.parse(savedDB);
-                } else {
-                    // Default data for the first run
-                    const defaultDB = {
-                        '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 },
-                        '8690504012177': { name: 'Eti Canga 45g', price: 9.75 },
-                        '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 },
-                        '8690987654321': { name: 'Pınar Süt 1L', price: 38.50 },
-                        '8681234567890': { name: 'Saka Su 0.5L', price: 5.00 },
-                        '8690526000018': { name: 'Tadım Ay Çekirdeği', price: 25.00 },
-                        '8697404547012': { name: 'Fuse Tea Şeftali 1L', price: 28.90 },
-                        '5000112664553': { name: 'Coca Cola 2.5lt', price: 75.00 },
-                        '5000112672039': { name: 'Coca Cola 1.5lt', price: 65.00 },
-                    };
-                    // Save the default to localStorage for next time
-                    localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(defaultDB));
-                    return defaultDB;
-                }
+                if (savedDB) return JSON.parse(savedDB);
+                const defaultDB = {
+                    '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 }, '8690504012177': { name: 'Eti Canga 45g', price: 9.75 }, '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 }, '8690987654321': { name: 'Pınar Süt 1L', price: 38.50 }, '8681234567890': { name: 'Saka Su 0.5L', price: 5.00 }, '8690526000018': { name: 'Tadım Ay Çekirdeği', price: 25.00 }, '8697404547012': { name: 'Fuse Tea Şeftali 1L', price: 28.90 }, '5000112664553': { name: 'Coca Cola 2.5lt', price: 75.00 }, '5000112672039': { name: 'Coca Cola 1.5lt', price: 65.00 },
+                };
+                localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(defaultDB));
+                return defaultDB;
             }
-            
-            /**
-             * Saves the current product database to localStorage.
-             */
             function saveProductDatabase() {
                 localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(productDatabase));
             }
 
-
-            // --- Product Database ---
             let productDatabase = loadProductDatabase();
-
-            // --- Application State ---
-            let cart = {}; 
+            let cart = {};
             let lastScanTime = 0;
 
-            // --- DOM Element References ---
+            // --- DOM Elements ---
             const manageProductsBtn = document.getElementById('manage-products-btn');
             const productModal = document.getElementById('product-modal');
             const closeModalBtn = document.getElementById('close-modal-btn');
@@ -190,158 +164,29 @@
             const scanResultElement = document.getElementById('scan-result');
             const scannerStatusElement = document.getElementById('scanner-status');
             const resetButton = document.getElementById('reset-button');
+            // New elements for form scanner
+            const scanBarcodeInFormBtn = document.getElementById('scan-barcode-in-form-btn');
+            const formScannerContainer = document.getElementById('form-scanner-container');
+            const closeFormScannerBtn = document.getElementById('close-form-scanner-btn');
 
-            // --- Modal Logic ---
-            manageProductsBtn.addEventListener('click', () => {
-                renderProductManagementList();
-                productModal.classList.remove('hidden');
-            });
-            closeModalBtn.addEventListener('click', () => productModal.classList.add('hidden'));
-            productModal.addEventListener('click', (e) => {
-                if(e.target === productModal) {
-                    productModal.classList.add('hidden');
-                }
-            });
+            // --- Scanner Instances ---
+            const mainScanner = new Html5Qrcode("qr-reader");
+            const formScanner = new Html5Qrcode("form-qr-reader");
+            let isMainScannerActive = false;
+
+            // --- Main Scanner Functions ---
+            const mainScannerConfig = { fps: 10, qrbox: { width: 250, height: 150 } };
             
-            // --- Product Management ---
-
-            function renderProductManagementList() {
-                productManagementList.innerHTML = '';
-                if (Object.keys(productDatabase).length === 0) {
-                    productManagementList.innerHTML = '<p class="text-slate-500 text-center">Tanımlı ürün yok.</p>';
-                    return;
-                }
-                for (const barcode in productDatabase) {
-                    const item = productDatabase[barcode];
-                    const div = document.createElement('div');
-                    div.className = 'flex justify-between items-center bg-slate-50 p-2 rounded-md';
-                    div.innerHTML = `
-                        <div class="flex-1">
-                            <p class="font-semibold text-slate-800">${item.name}</p>
-                            <p class="text-sm text-slate-500">Barkod: ${barcode} - Fiyat: ${item.price.toFixed(2)} TL</p>
-                        </div>
-                        <div class="flex space-x-2">
-                            <button data-barcode="${barcode}" class="edit-btn action-button text-blue-500 hover:text-blue-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                            <button data-barcode="${barcode}" class="delete-btn action-button text-red-500 hover:text-red-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                        </div>
-                    `;
-                    productManagementList.appendChild(div);
-                }
-            }
-
-            function resetProductForm() {
-                productForm.reset();
-                originalBarcode.value = '';
-                formTitle.textContent = 'Yeni Ürün Ekle';
-                formSubmitBtn.textContent = 'Ekle';
-                formSubmitBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                formSubmitBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-                formCancelBtn.classList.add('hidden');
-            }
-
-            productForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const barcode = barcodeInput.value.trim();
-                const name = nameInput.value.trim();
-                const price = parseFloat(priceInput.value);
-                const originalBC = originalBarcode.value;
-
-                if (!barcode || !name || isNaN(price)) {
-                    alert('Lütfen tüm alanları doğru doldurun.');
-                    return;
-                }
-                
-                if (originalBC) {
-                    if (originalBC !== barcode) { 
-                        delete productDatabase[originalBC];
-                    }
-                    productDatabase[barcode] = { name, price };
-                } 
-                else {
-                     if (productDatabase[barcode]) {
-                        alert('Bu barkod zaten kayıtlı!');
-                        return;
-                    }
-                    productDatabase[barcode] = { name, price };
-                }
-                
-                saveProductDatabase(); // <-- Save changes to localStorage
-                renderProductManagementList();
-                resetProductForm();
-            });
-
-            productManagementList.addEventListener('click', (e) => {
-                const editBtn = e.target.closest('.edit-btn');
-                const deleteBtn = e.target.closest('.delete-btn');
-
-                if (editBtn) {
-                    const barcode = editBtn.dataset.barcode;
-                    const item = productDatabase[barcode];
-                    originalBarcode.value = barcode;
-                    barcodeInput.value = barcode;
-                    nameInput.value = item.name;
-                    priceInput.value = item.price;
-                    formTitle.textContent = 'Ürünü Düzenle';
-                    formSubmitBtn.textContent = 'Güncelle';
-                    formSubmitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                    formSubmitBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-                    formCancelBtn.classList.remove('hidden');
-                }
-
-                if (deleteBtn) {
-                    const barcode = deleteBtn.dataset.barcode;
-                    if (confirm(`'${productDatabase[barcode].name}' ürününü silmek istediğinize emin misiniz?`)) {
-                        delete productDatabase[barcode];
-                        saveProductDatabase(); // <-- Save changes to localStorage
-                        renderProductManagementList();
-                    }
-                }
-            });
-
-            formCancelBtn.addEventListener('click', resetProductForm);
-
-            // --- Cart Logic ---
-            function updateCartUI() {
-                scannedItemsList.innerHTML = '';
-                if (Object.keys(cart).length === 0) {
-                    scannedItemsList.innerHTML = '<p id="empty-cart-message" class="text-slate-500 text-center">Henüz ürün okutulmadı.</p>';
-                } else {
-                    for (const barcode in cart) {
-                        const item = cart[barcode];
-                        const listItem = document.createElement('div');
-                        listItem.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
-                         if (item.isNew) {
-                           listItem.classList.add('highlight-item');
-                           delete item.isNew;
-                        }
-                        listItem.innerHTML = `
-                            <span class="text-slate-800">${item.name} (x${item.quantity})</span>
-                            <div class="flex items-center space-x-4">
-                                <span class="font-semibold text-slate-600">${(item.price * item.quantity).toFixed(2)} TL</span>
-                                <button data-barcode="${barcode}" class="remove-from-cart-btn action-button text-red-400 hover:text-red-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                            </div>
-                        `;
-                        scannedItemsList.appendChild(listItem);
-                    }
-                    scannedItemsList.scrollTop = scannedItemsList.scrollHeight;
-                }
-                const total = Object.values(cart).reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                totalPriceElement.textContent = `${total.toFixed(2)} TL`;
-            }
-            
-            function onScanSuccess(decodedText) {
+            function onMainScanSuccess(decodedText) {
                 const now = Date.now();
-                if (now - lastScanTime < 2000) { return; }
+                if (now - lastScanTime < 2000) return;
                 lastScanTime = now;
                 const productInfo = productDatabase[decodedText];
                 if (productInfo) {
                     scanResultElement.textContent = `Eklendi: ${productInfo.name}`;
                     scanResultElement.parentElement.classList.add('bg-green-100');
-                    if (cart[decodedText]) {
-                        cart[decodedText].quantity++;
-                    } else {
-                        cart[decodedText] = { ...productInfo, quantity: 1, isNew: true };
-                    }
+                    if (cart[decodedText]) cart[decodedText].quantity++;
+                    else cart[decodedText] = { ...productInfo, quantity: 1, isNew: true };
                     updateCartUI();
                 } else {
                     scanResultElement.textContent = `Ürün bulunamadı: ${decodedText}`;
@@ -350,33 +195,151 @@
                 setTimeout(() => { scanResultElement.parentElement.classList.remove('bg-green-100', 'bg-red-100'); }, 1500);
             }
 
-            function onScanFailure(error) { /* Be quiet on failure */ }
-            
-            function resetScanner() {
-                cart = {};
-                scanResultElement.textContent = 'Liste temizlendi. Yeni tarama yapabilirsiniz.';
-                updateCartUI();
+            async function startMainScanner() {
+                if (isMainScannerActive) return;
+                try {
+                    await mainScanner.start({ facingMode: "environment" }, mainScannerConfig, onMainScanSuccess, () => {});
+                    isMainScannerActive = true;
+                    scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
+                } catch (err) {
+                    scannerStatusElement.textContent = 'Ana kamera başlatılamadı!';
+                }
             }
 
+            async function stopMainScanner() {
+                if (!isMainScannerActive) return;
+                try {
+                    await mainScanner.stop();
+                    isMainScannerActive = false;
+                } catch (err) { console.error("Ana kamera durdurulamadı:", err); }
+            }
+
+            // --- Form Scanner Functions ---
+            async function onFormScanSuccess(decodedText) {
+                barcodeInput.value = decodedText;
+                await stopFormScannerAndRestartMain();
+            }
+            
+            async function stopFormScannerAndRestartMain() {
+                try {
+                    await formScanner.stop();
+                } catch(err) { /* ignore if already stopped */ }
+                formScannerContainer.classList.add('hidden');
+                if (!productModal.classList.contains('hidden')) {
+                     // Do nothing, let modal logic handle it
+                } else {
+                    await startMainScanner();
+                }
+            }
+            
+            // --- Modal & Form Logic ---
+            manageProductsBtn.addEventListener('click', async () => {
+                await stopMainScanner();
+                renderProductManagementList();
+                productModal.classList.remove('hidden');
+            });
+
+            async function closeModal() {
+                await stopFormScannerAndRestartMain();
+                productModal.classList.add('hidden');
+                resetProductForm();
+                await startMainScanner();
+            }
+
+            closeModalBtn.addEventListener('click', closeModal);
+            productModal.addEventListener('click', (e) => {
+                if(e.target === productModal) closeModal();
+            });
+
+            scanBarcodeInFormBtn.addEventListener('click', async () => {
+                formScannerContainer.classList.remove('hidden');
+                try {
+                    await formScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onFormScanSuccess, () => {});
+                } catch (err) {
+                    alert('Form kamerası başlatılamadı. Lütfen kamera izinlerini kontrol edin.');
+                    formScannerContainer.classList.add('hidden');
+                }
+            });
+            
+            closeFormScannerBtn.addEventListener('click', stopFormScannerAndRestartMain);
+
+            // --- Product Management Logic ---
+            function renderProductManagementList() {
+                productManagementList.innerHTML = '';
+                Object.keys(productDatabase).forEach(barcode => {
+                    const item = productDatabase[barcode];
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center bg-slate-50 p-2 rounded-md';
+                    div.innerHTML = `
+                        <div class="flex-1 min-w-0">
+                            <p class="font-semibold text-slate-800 truncate">${item.name}</p>
+                            <p class="text-sm text-slate-500 truncate">Barkod: ${barcode} - Fiyat: ${item.price.toFixed(2)} TL</p>
+                        </div>
+                        <div class="flex space-x-2 flex-shrink-0">
+                            <button data-barcode="${barcode}" class="edit-btn action-button text-blue-500 hover:text-blue-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                            <button data-barcode="${barcode}" class="delete-btn action-button text-red-500 hover:text-red-700 p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </div>`;
+                    productManagementList.appendChild(div);
+                });
+            }
+
+            function resetProductForm() {
+                productForm.reset(); originalBarcode.value = ''; formTitle.textContent = 'Yeni Ürün Ekle'; formSubmitBtn.textContent = 'Ekle';
+                formSubmitBtn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors";
+                formCancelBtn.classList.add('hidden');
+            }
+
+            productForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const barcode = barcodeInput.value.trim(); const name = nameInput.value.trim(); const price = parseFloat(priceInput.value); const originalBC = originalBarcode.value;
+                if (!barcode || !name || isNaN(price)) { alert('Lütfen tüm alanları doğru doldurun.'); return; }
+                if (originalBC) { if (originalBC !== barcode) delete productDatabase[originalBC]; productDatabase[barcode] = { name, price }; } 
+                else { if (productDatabase[barcode]) { alert('Bu barkod zaten kayıtlı!'); return; } productDatabase[barcode] = { name, price }; }
+                saveProductDatabase(); renderProductManagementList(); resetProductForm();
+            });
+
+            productManagementList.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-btn'); const deleteBtn = e.target.closest('.delete-btn');
+                if (editBtn) {
+                    const barcode = editBtn.dataset.barcode; const item = productDatabase[barcode];
+                    originalBarcode.value = barcode; barcodeInput.value = barcode; nameInput.value = item.name; priceInput.value = item.price;
+                    formTitle.textContent = 'Ürünü Düzenle'; formSubmitBtn.textContent = 'Güncelle';
+                    formSubmitBtn.className = "w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors";
+                    formCancelBtn.classList.remove('hidden');
+                }
+                if (deleteBtn) {
+                    const barcode = deleteBtn.dataset.barcode;
+                    if (confirm(`'${productDatabase[barcode].name}' ürününü silmek istediğinize emin misiniz?`)) { delete productDatabase[barcode]; saveProductDatabase(); renderProductManagementList(); }
+                }
+            });
+            formCancelBtn.addEventListener('click', resetProductForm);
+
+            // --- Cart Logic ---
+            function updateCartUI() {
+                scannedItemsList.innerHTML = '';
+                if (Object.keys(cart).length === 0) { scannedItemsList.innerHTML = '<p id="empty-cart-message" class="text-slate-500 text-center">Henüz ürün okutulmadı.</p>'; } 
+                else {
+                    Object.keys(cart).forEach(barcode => {
+                        const item = cart[barcode]; const listItem = document.createElement('div'); listItem.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm';
+                        if (item.isNew) { listItem.classList.add('highlight-item'); delete item.isNew; }
+                        listItem.innerHTML = `<span class="text-slate-800">${item.name} (x${item.quantity})</span> <div class="flex items-center space-x-4"> <span class="font-semibold text-slate-600">${(item.price * item.quantity).toFixed(2)} TL</span> <button data-barcode="${barcode}" class="remove-from-cart-btn action-button text-red-400 hover:text-red-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button> </div>`;
+                        scannedItemsList.appendChild(listItem);
+                    });
+                    scannedItemsList.scrollTop = scannedItemsList.scrollHeight;
+                }
+                const total = Object.values(cart).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                totalPriceElement.textContent = `${total.toFixed(2)} TL`;
+            }
+            function resetScanner() { cart = {}; scanResultElement.textContent = 'Liste temizlendi. Yeni tarama yapabilirsiniz.'; updateCartUI(); }
             scannedItemsList.addEventListener('click', (event) => {
                 const removeButton = event.target.closest('.remove-from-cart-btn');
-                if (removeButton) {
-                    const barcodeToDelete = removeButton.dataset.barcode;
-                    if (cart[barcodeToDelete]) {
-                        delete cart[barcodeToDelete];
-                        updateCartUI();
-                    }
-                }
+                if (removeButton) { const barcodeToDelete = removeButton.dataset.barcode; if (cart[barcodeToDelete]) { delete cart[barcodeToDelete]; updateCartUI(); } }
             });
 
             // --- Initialization ---
-            const html5QrCode = new Html5Qrcode("qr-reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
-            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
-                .then(() => { scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.'; })
-                .catch(() => { scannerStatusElement.textContent = 'Kamera başlatılamadı!'; });
             resetButton.addEventListener('click', resetScanner);
             updateCartUI();
+            startMainScanner();
         });
     </script>
 </body>
