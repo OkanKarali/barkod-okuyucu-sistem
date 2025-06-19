@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barkod Okuyucu Kasa Sistemi</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- html5-qrcode library for barcode scanning -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the scanner region border */
+        #qr-reader-region {
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        /* Custom animation for highlighting found items */
+        @keyframes highlight {
+            0% { background-color: #dbeafe; } /* blue-100 */
+            100% { background-color: transparent; }
+        }
+        .highlight-item {
+            animation: highlight 1.5s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-6 space-y-6">
+        
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-2xl font-bold text-slate-800">Barkod Okuyucu Kasa</h1>
+            <p class="text-sm text-slate-500 mt-1">Ürün barkodunu okutarak listeye ekleyin.</p>
+        </div>
+
+        <!-- Barcode Scanner Area -->
+        <div id="scanner-container" class="bg-slate-200 rounded-lg p-2">
+            <div id="qr-reader" class="w-full"></div>
+            <p id="scanner-status" class="text-center text-sm text-slate-600 mt-2">Kamera başlatılıyor...</p>
+        </div>
+        
+        <!-- Last Scanned Result -->
+        <div id="scan-result-container" class="h-12 flex items-center justify-center bg-gray-50 rounded-lg transition-all duration-300">
+             <p id="scan-result" class="text-center text-slate-700 font-medium">Kamerayı bir barkoda doğrultun</p>
+        </div>
+
+        <!-- Scanned Items (Shopping Cart) -->
+        <div>
+            <h2 class="text-lg font-semibold text-slate-700 mb-2">Okutulan Ürünler</h2>
+            <div id="scanned-items-list" class="space-y-2 max-h-60 overflow-y-auto bg-slate-50 p-3 rounded-lg border">
+                <p id="empty-cart-message" class="text-slate-500 text-center">Henüz ürün okutulmadı.</p>
+            </div>
+        </div>
+
+        <!-- Total Price and Reset Button -->
+        <div class="border-t pt-4 space-y-4">
+            <div class="flex justify-between items-center">
+                <span class="text-xl font-bold text-slate-800">TOPLAM:</span>
+                <span id="total-price" class="text-2xl font-bold text-blue-600">0.00 TL</span>
+            </div>
+            <button id="reset-button" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg">
+                Listeyi Sıfırla
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- Product Database ---
+            // In a real application, this data would come from a server/API.
+            // For this demo, we use a simple JavaScript object.
+            const productDatabase = {
+                '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 },
+                '8690504012177': { name: 'Eti Canga 45g', price: 9.75 },
+                '8690123456789': { name: 'Dimes Meyve Suyu 1L', price: 32.25 },
+                '8690987654321': { name: 'Pınar Süt 1L', price: 38.50 },
+                '8681234567890': { name: 'Saka Su 0.5L', price: 5.00 },
+                '8690526000018': { name: 'Tadım Ay Çekirdeği', price: 25.00 },
+                '8697404547012': { name: 'Fuse Tea Şeftali 1L', price: 28.90 },
+            };
+
+            // --- Application State ---
+            let scannedItems = [];
+            let lastScanTime = 0;
+
+            // --- DOM Element References ---
+            const scannedItemsList = document.getElementById('scanned-items-list');
+            const emptyCartMessage = document.getElementById('empty-cart-message');
+            const totalPriceElement = document.getElementById('total-price');
+            const scanResultElement = document.getElementById('scan-result');
+            const scannerStatusElement = document.getElementById('scanner-status');
+            const resetButton = document.getElementById('reset-button');
+
+            // --- Main Functions ---
+
+            /**
+             * Updates the UI based on the current state of scannedItems.
+             * It re-renders the list and recalculates the total price.
+             */
+            function updateCartUI() {
+                // Clear the current list
+                scannedItemsList.innerHTML = '';
+
+                if (scannedItems.length === 0) {
+                    scannedItemsList.appendChild(emptyCartMessage);
+                    emptyCartMessage.style.display = 'block';
+                } else {
+                    emptyCartMessage.style.display = 'none';
+                    let currentTotal = 0;
+                    
+                    scannedItems.forEach(item => {
+                        // Create a new list item element
+                        const listItem = document.createElement('div');
+                        listItem.className = 'flex justify-between items-center bg-white p-2 rounded-md shadow-sm highlight-item';
+                        
+                        const itemName = document.createElement('span');
+                        itemName.className = 'text-slate-800';
+                        itemName.textContent = item.name;
+
+                        const itemPrice = document.createElement('span');
+                        itemPrice.className = 'font-semibold text-slate-600';
+                        itemPrice.textContent = `${item.price.toFixed(2)} TL`;
+                        
+                        listItem.appendChild(itemName);
+                        listItem.appendChild(itemPrice);
+                        
+                        scannedItemsList.appendChild(listItem);
+
+                        // Add to total
+                        currentTotal += item.price;
+                    });
+
+                     // Scroll to the bottom of the list
+                    scannedItemsList.scrollTop = scannedItemsList.scrollHeight;
+                }
+                
+                // Update total price display
+                const total = scannedItems.reduce((sum, item) => sum + item.price, 0);
+                totalPriceElement.textContent = `${total.toFixed(2)} TL`;
+            }
+            
+            /**
+             * Handles successful barcode scans.
+             * @param {string} decodedText - The decoded barcode number.
+             * @param {object} decodedResult - Detailed result object from the library.
+             */
+            function onScanSuccess(decodedText, decodedResult) {
+                // To prevent multiple rapid scans of the same item
+                const now = Date.now();
+                if (now - lastScanTime < 2000) { // 2 second cooldown
+                    return;
+                }
+                lastScanTime = now;
+
+                const product = productDatabase[decodedText];
+
+                if (product) {
+                    scanResultElement.textContent = `Bulundu: ${product.name}`;
+                    scanResultElement.parentElement.classList.add('bg-green-100');
+                    scanResultElement.parentElement.classList.remove('bg-red-100');
+                    
+                    scannedItems.push(product);
+                    updateCartUI();
+
+                } else {
+                    scanResultElement.textContent = `Ürün bulunamadı: ${decodedText}`;
+                    scanResultElement.parentElement.classList.add('bg-red-100');
+                    scanResultElement.parentElement.classList.remove('bg-green-100');
+                }
+
+                // Reset the result message style after a short delay
+                setTimeout(() => {
+                    scanResultElement.parentElement.classList.remove('bg-green-100', 'bg-red-100');
+                }, 1500);
+            }
+
+            /**
+             * Handles scan failures (not used in this logic but required by the library).
+             * @param {string} error - The error message.
+             */
+            function onScanFailure(error) {
+                // This function is called frequently, so we keep it quiet.
+                // You can uncomment the line below for debugging.
+                // console.warn(`Code scan error = ${error}`);
+            }
+            
+            /**
+             * Resets the application to its initial state.
+             */
+            function resetScanner() {
+                scannedItems = [];
+                scanResultElement.textContent = 'Liste temizlendi. Yeni tarama yapabilirsiniz.';
+                updateCartUI();
+            }
+
+
+            // --- Initialization ---
+
+            // Create a new scanner instance
+            const html5QrCode = new Html5Qrcode("qr-reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+
+            // Start the scanner
+            html5QrCode.start(
+                { facingMode: "environment" }, // Use the back camera
+                config,
+                onScanSuccess,
+                onScanFailure
+            ).then(() => {
+                scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
+                document.getElementById('qr-reader-region').style.borderStyle = 'solid';
+            }).catch(err => {
+                scannerStatusElement.textContent = 'Kamera başlatılamadı! Lütfen izinleri kontrol edin.';
+                scannerStatusElement.classList.add('text-red-600', 'font-semibold');
+                console.error("Kamera başlatma hatası:", err);
+            });
+
+            // Add event listener for the reset button
+            resetButton.addEventListener('click', resetScanner);
+            
+            // Initial UI update
+            updateCartUI();
+        });
+    </script>
+</body>
+</html>
