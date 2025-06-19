@@ -53,14 +53,9 @@
             <p class="text-sm text-slate-500 mt-1">Ürün barkodunu okutarak listeye ekleyin.</p>
         </div>
 
-        <div id="scanner-container" class="bg-slate-200 rounded-lg p-4 flex flex-col items-center justify-center min-h-[200px]">
-            <div id="start-camera-prompt" class="text-center">
-                <button id="start-camera-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-lg">
-                    Kamerayı Başlat
-                </button>
-                 <p id="scanner-status" class="text-center text-sm text-slate-600 mt-4">Taramayı başlatmak için dokunun.</p>
-            </div>
-            <div id="qr-reader" class="w-full scanner-region hidden"></div>
+        <div id="scanner-container" class="bg-slate-200 rounded-lg p-2">
+            <div id="qr-reader" class="w-full scanner-region"></div>
+            <p id="scanner-status" class="text-center text-sm text-slate-600 mt-2">Kamera başlatılıyor...</p>
         </div>
         
         <div id="scan-result-container" class="h-12 flex items-center justify-center bg-gray-50 rounded-lg transition-all duration-300">
@@ -209,9 +204,6 @@
         const modalMessage = document.getElementById('modal-message');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
-        const qrReaderDiv = document.getElementById('qr-reader');
-        const startCameraPrompt = document.getElementById('start-camera-prompt');
-        const startCameraBtn = document.getElementById('start-camera-btn');
         let confirmCallback = null;
 
         // --- UI Rendering Functions (Global Scope) ---
@@ -275,8 +267,7 @@
         }
 
         // --- Firebase Data Functions ---
-        async function listenForProductChanges(userId) {
-            productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
+        async function listenForProductChanges() {
             const initialSnapshot = await getDocs(productCollectionRef);
             if (initialSnapshot.empty) {
                 console.log("Ürün bulunamadı. Varsayılan veriler yükleniyor.");
@@ -328,32 +319,20 @@
                 qrbox: { width: 250, height: 150 },
                 rememberLastUsedCamera: true
             };
+            const videoConstraints = { facingMode: { ideal: "environment" } };
             
             async function startMainScanner() {
                 if (isMainScannerActive) return;
                 
-                startCameraPrompt.classList.add('hidden');
-                qrReaderDiv.classList.remove('hidden');
-                scannerStatusElement.textContent = 'Kamera izni isteniyor...';
+                scannerStatusElement.textContent = 'Kamera başlatılıyor...';
 
                 try {
-                    const cameras = await Html5Qrcode.getCameras();
-                    if (cameras && cameras.length) {
-                        const cameraId = cameras.find(c => c.label.toLowerCase().includes('back'))?.id || cameras[0].id;
-                        scannerStatusElement.textContent = 'Kamera başlatılıyor...';
-                        await mainScanner.start(cameraId, scannerConfig, onMainScanSuccess, () => {});
-                        isMainScannerActive = true;
-                        scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
-                    } else {
-                        scannerStatusElement.textContent = 'Kamera bulunamadı.';
-                        startCameraPrompt.classList.remove('hidden');
-                        qrReaderDiv.classList.add('hidden');
-                    }
+                    await mainScanner.start(videoConstraints, scannerConfig, onMainScanSuccess, () => {});
+                    isMainScannerActive = true;
+                    scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
                 } catch (err) { 
                     console.error("Kamera başlatma hatası:", err);
                     scannerStatusElement.textContent = 'Kamera başlatılamadı!'; 
-                    startCameraPrompt.classList.remove('hidden');
-                    qrReaderDiv.classList.add('hidden');
                 }
             }
 
@@ -362,23 +341,14 @@
                 try { 
                     await mainScanner.stop(); 
                     isMainScannerActive = false; 
-                    qrReaderDiv.classList.add('hidden');
-                    startCameraPrompt.classList.remove('hidden');
-                    scannerStatusElement.textContent = 'Taramayı başlatmak için dokunun.';
+                    scannerStatusElement.textContent = 'Kamera durduruldu.';
                 } catch (err) { console.error("Ana kamera durdurulamadı:", err); }
             }
 
             async function startFormScanner() {
                 formScannerContainer.classList.remove('hidden');
                 try {
-                    const cameras = await Html5Qrcode.getCameras();
-                    if (cameras && cameras.length) {
-                         const cameraId = cameras.find(c => c.label.toLowerCase().includes('back'))?.id || cameras[0].id;
-                         await formScanner.start(cameraId, scannerConfig, onFormScanSuccess, () => {});
-                    } else {
-                         showConfirmationModal('Kamera bulunamadı.', null, true);
-                         formScannerContainer.classList.add('hidden');
-                    }
+                    await formScanner.start(videoConstraints, scannerConfig, onFormScanSuccess, () => {});
                 } catch (err) {
                     showConfirmationModal('Kamera başlatılamadı. Lütfen kamera izinlerini kontrol edin.', null, true);
                     formScannerContainer.classList.add('hidden');
@@ -469,8 +439,6 @@
             function resetScanner() { cart = {}; scanResultElement.textContent = 'Liste temizlendi. Yeni tarama yapabilirsiniz.'; updateCartUI(); }
             
             // --- Event Listeners ---
-            startCameraBtn.addEventListener('click', startMainScanner);
-
             manageProductsBtn.addEventListener('click', async () => {
                 await stopMainScanner();
                 renderProductManagementList();
@@ -570,7 +538,7 @@
                     const userId = user.uid;
                     productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
                     listenForProductChanges();
-                    // Do NOT start scanner automatically. Wait for user click.
+                    startMainScanner(); // Auto-start camera
                 } else {
                     console.log("Kullanıcı çıkış yaptı. Anonim olarak giriş yapılıyor.");
                     signInAnonymously(auth).catch(error => {
@@ -581,4 +549,4 @@
         });
     </script>
 </body>
-</ht
+</html>
