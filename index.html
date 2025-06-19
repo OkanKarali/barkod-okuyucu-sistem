@@ -314,34 +314,21 @@
             const formScanner = new Html5Qrcode("form-qr-reader");
             let isMainScannerActive = false;
             
-            // IOS COMPATIBILITY FIX: New robust configuration for scanners.
+            // IOS COMPATIBILITY FIX: Simplified and more direct configuration for scanners.
             const scannerConfig = {
                 fps: 10,
-                qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    let qrboxSize = Math.floor(minEdge * 0.7);
-                    return {
-                        width: qrboxSize,
-                        height: qrboxSize,
-                    };
-                },
-                rememberLastUsedCamera: true,
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                },
-                formatsToSupport: [
-                    Html5Qrcode.getSupportedFormats().EAN_13,
-                    Html5Qrcode.getSupportedFormats().EAN_8,
-                    Html5Qrcode.getSupportedFormats().CODE_128,
-                    Html5Qrcode.getSupportedFormats().UPC_A,
-                    Html5Qrcode.getSupportedFormats().UPC_E
-                ]
+                qrbox: { width: 250, height: 150 }, // Using a simple, fixed qrbox.
+                rememberLastUsedCamera: true
+            };
+
+            const videoConstraints = {
+                facingMode: { ideal: "environment" }
             };
             
             async function startMainScanner() {
                 if (isMainScannerActive) return;
                 try {
-                    await mainScanner.start({ facingMode: "environment" }, scannerConfig, onMainScanSuccess, () => {});
+                    await mainScanner.start(videoConstraints, scannerConfig, onMainScanSuccess, () => {});
                     isMainScannerActive = true;
                     scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
                 } catch (err) { scannerStatusElement.textContent = 'Ana kamera başlatılamadı!'; }
@@ -356,7 +343,7 @@
             async function startFormScanner() {
                 formScannerContainer.classList.remove('hidden');
                 try {
-                    await formScanner.start({ facingMode: "environment" }, scannerConfig, onFormScanSuccess, () => {});
+                    await formScanner.start(videoConstraints, scannerConfig, onFormScanSuccess, () => {});
                 } catch (err) {
                     showConfirmationModal('Kamera başlatılamadı. Lütfen kamera izinlerini kontrol edin.', null, true);
                     formScannerContainer.classList.add('hidden');
