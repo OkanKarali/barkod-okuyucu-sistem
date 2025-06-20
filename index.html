@@ -73,6 +73,9 @@
             height: auto !important;
             border-radius: 8px;
         }
+        #scan-result-container {
+             transition: background-color 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -93,7 +96,9 @@
             <div id="qr-reader" class="hidden" style="border-radius: 8px; overflow: hidden;"></div>
         </div>
         
-        <p id="scan-result" style="text-align: center; font-weight: 500; min-height: 24px; padding: 0.5rem;"></p>
+        <div id="scan-result-container" style="border-radius: 8px; background-color: #f8f9fa;">
+            <p id="scan-result" style="text-align: center; font-weight: 500; min-height: 24px; padding: 0.5rem;"></p>
+        </div>
 
         <div>
             <h2>Okutulan Ürünler</h2>
@@ -178,6 +183,7 @@
         const scannedItemsList = document.getElementById('scanned-items-list');
         const totalPriceElement = document.getElementById('total-price');
         const scanResultElement = document.getElementById('scan-result');
+        const scanResultContainer = document.getElementById('scan-result-container');
         const scannerStatusElement = document.getElementById('scanner-status');
         const resetButton = document.getElementById('reset-button');
         const qrReaderDiv = document.getElementById('qr-reader');
@@ -188,7 +194,7 @@
             if (Date.now() - lastScanTime < 2000) return;
             lastScanTime = Date.now();
             
-            navigator.vibrate(100);
+            if (navigator.vibrate) navigator.vibrate(100);
 
             const product = productDatabase[decodedText];
             if (product) {
@@ -198,10 +204,16 @@
                     cart[decodedText] = { ...product, quantity: 1 };
                 }
                 scanResultElement.textContent = `Eklendi: ${product.name}`;
+                scanResultContainer.style.backgroundColor = '#dcfce7'; // Tailwind green-100
             } else {
                 scanResultElement.textContent = `Ürün bulunamadı: ${decodedText}`;
+                 scanResultContainer.style.backgroundColor = '#fee2e2'; // Tailwind red-100
             }
             updateCartUI();
+
+            setTimeout(() => {
+                scanResultContainer.style.backgroundColor = '#f8f9fa';
+            }, 1500);
         }
 
         function onScanFailure(error) {
@@ -216,19 +228,15 @@
             qrReaderDiv.classList.remove('hidden');
             scannerStatusElement.textContent = 'Kamera başlatılıyor...';
 
-            // IMPORTANT CHANGE: Define which formats to support
             const formatsToSupport = [
                 Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.CODE_128,
                 Html5QrcodeSupportedFormats.EAN_8,
-                Html5QrcodeSupportedFormats.UPC_A,
-                Html5QrcodeSupportedFormats.UPC_E,
-                Html5QrcodeSupportedFormats.QR_CODE
+                Html5QrcodeSupportedFormats.CODE_128,
             ];
 
             const config = { 
                 fps: 10, 
-                qrbox: { width: 250, height: 100 }, // Rectangular box is better for barcodes
+                qrbox: { width: 250, height: 100 },
                 supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
                 formatsToSupport: formatsToSupport
             };
