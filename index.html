@@ -273,9 +273,18 @@
             qrReaderDiv.classList.remove('hidden');
             scannerStatusElement.textContent = 'Kamera izni isteniyor...';
 
-            const config = { fps: 10, aspectRatio: 1.0 };
+            const config = { 
+                fps: 10,
+                // Removed qrbox and aspectRatio for max compatibility
+            };
 
-            mainScanner.start({ facingMode: "environment" }, config, onMainScanSuccess)
+            mainScanner.start(
+                { facingMode: "environment" },
+                config,
+                onMainScanSuccess,
+                (errorMessage) => {
+                    // console.log("Tarama hatası:", errorMessage);
+                })
                 .then(_ => {
                     console.log("Kamera başarıyla başlatıldı.");
                     isMainScannerActive = true;
