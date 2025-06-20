@@ -228,7 +228,7 @@
         // --- App State ---
         let cart = {};
         let lastScanTime = 0;
-        const mainScanner = new Html5Qrcode("qr-reader");
+        const mainScanner = new Html5Qrcode("qr-reader", { verbose: false });
         let isMainScannerActive = false;
 
         // --- Firebase Data Functions ---
@@ -267,63 +267,48 @@
         }
 
         // --- Scanner Logic ---
-        async function startMainScanner() {
+        function startMainScanner() {
             if (isMainScannerActive) return;
             startCameraPrompt.classList.add('hidden');
             qrReaderDiv.classList.remove('hidden');
             scannerStatusElement.textContent = 'Kamera izni isteniyor...';
 
-            // IOS COMPATIBILITY FIX: More specific configuration
-            const scannerConfig = {
-                fps: 10,
-                // Using a specific qrbox function can help some devices.
-                qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const qrboxSize = Math.floor(minEdge * 0.8); // Make it a bit larger
-                    return { width: qrboxSize, height: qrboxSize };
-                },
-                // Explicitly define formats to look for
-                formatsToSupport: [ 
-                    Html5Qrcode.getSupportedFormats().EAN_13,
-                    Html5Qrcode.getSupportedFormats().CODE_128,
-                    Html5Qrcode.getSupportedFormats().EAN_8,
-                    Html5Qrcode.getSupportedFormats().UPC_A,
-                    Html5Qrcode.getSupportedFormats().UPC_E
-                ],
-            };
+            const config = { fps: 10, aspectRatio: 1.0 };
 
-            try {
-                await mainScanner.start(
-                    { facingMode: "environment" }, 
-                    scannerConfig,
-                    onMainScanSuccess,
-                    () => {} // Ignore continuous scan failures
-                );
-                isMainScannerActive = true;
-                scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
-            } catch (err) {
-                console.error("Kamera başlatma hatası:", err);
-                scannerStatusElement.textContent = 'Kamera başlatılamadı!';
-                qrReaderDiv.classList.add('hidden');
-                startCameraPrompt.classList.remove('hidden');
-            }
+            mainScanner.start({ facingMode: "environment" }, config, onMainScanSuccess)
+                .then(_ => {
+                    console.log("Kamera başarıyla başlatıldı.");
+                    isMainScannerActive = true;
+                    scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
+                })
+                .catch(err => {
+                    console.error(`Kamera başlatılamadı: ${err}`);
+                    scannerStatusElement.textContent = 'Kamera başlatılamadı!';
+                    qrReaderDiv.classList.add('hidden');
+                    startCameraPrompt.classList.remove('hidden');
+                });
         }
 
-        async function stopMainScanner() {
-            if (!isMainScannerActive || mainScanner.getState() !== 2) return;
-            try { 
-                await mainScanner.stop(); 
-                isMainScannerActive = false;
-                qrReaderDiv.classList.add('hidden');
-                startCameraPrompt.classList.remove('hidden');
-                scannerStatusElement.textContent = 'Taramayı başlatmak için dokunun.';
-            } catch (err) { console.error("Ana kamera durdurulamadı:", err); }
+        function stopMainScanner() {
+            if (!isMainScannerActive) return;
+            mainScanner.stop()
+                .then(_ => {
+                    isMainScannerActive = false;
+                    qrReaderDiv.classList.add('hidden');
+                    startCameraPrompt.classList.remove('hidden');
+                    scannerStatusElement.textContent = 'Taramayı başlatmak için dokunun.';
+                    console.log("Kamera durduruldu.");
+                })
+                .catch(err => {
+                    console.error(`Kamera durdurulamadı: ${err}`);
+                });
         }
         
-        function onMainScanSuccess(decodedText, decodedResult) {
-             console.log(`Barkod okundu: ${decodedText}`); // Debug message
+        function onMainScanSuccess(decodedText) {
             if (Date.now() - lastScanTime < 1500) return;
             lastScanTime = Date.now();
+            console.log(`Okunan barkod: ${decodedText}`);
+            
             const product = productDatabase[decodedText];
             if (product) {
                 if(cart[decodedText]) {
@@ -409,14 +394,14 @@
         startCameraBtn.addEventListener('click', startMainScanner);
         resetButton.addEventListener('click', () => { cart = {}; updateCartUI(); });
 
-        manageProductsBtn.addEventListener('click', async () => {
-            await stopMainScanner();
+        manageProductsBtn.addEventListener('click', () => {
+            stopMainScanner();
             productModal.style.display = 'flex';
         });
 
-        closeModalBtn.addEventListener('click', async () => {
+        closeModalBtn.addEventListener('click', () => {
             productModal.style.display = 'none';
-            await startMainScanner();
+            startMainScanner();
         });
 
         productSearchInput.addEventListener('input', (e) => renderProductManagementList(e.target.value));
