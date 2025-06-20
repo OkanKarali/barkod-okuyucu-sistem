@@ -273,18 +273,34 @@
             qrReaderDiv.classList.remove('hidden');
             scannerStatusElement.textContent = 'Kamera izni isteniyor...';
 
-            // IMPORTANT CHANGE: Removed qrbox to use full viewfinder for max compatibility
-            const scannerConfig = { fps: 10 };
+            // IOS COMPATIBILITY FIX: More specific configuration
+            const scannerConfig = {
+                fps: 10,
+                // Using a specific qrbox function can help some devices.
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    const qrboxSize = Math.floor(minEdge * 0.8); // Make it a bit larger
+                    return { width: qrboxSize, height: qrboxSize };
+                },
+                // Explicitly define formats to look for
+                formatsToSupport: [ 
+                    Html5Qrcode.getSupportedFormats().EAN_13,
+                    Html5Qrcode.getSupportedFormats().CODE_128,
+                    Html5Qrcode.getSupportedFormats().EAN_8,
+                    Html5Qrcode.getSupportedFormats().UPC_A,
+                    Html5Qrcode.getSupportedFormats().UPC_E
+                ],
+            };
 
             try {
                 await mainScanner.start(
                     { facingMode: "environment" }, 
                     scannerConfig,
                     onMainScanSuccess,
-                    () => {}
+                    () => {} // Ignore continuous scan failures
                 );
                 isMainScannerActive = true;
-                scannerStatusElement.textContent = 'Kamera aktif. Barkodu ekranın ortasına getirin.';
+                scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
             } catch (err) {
                 console.error("Kamera başlatma hatası:", err);
                 scannerStatusElement.textContent = 'Kamera başlatılamadı!';
@@ -304,7 +320,8 @@
             } catch (err) { console.error("Ana kamera durdurulamadı:", err); }
         }
         
-        function onMainScanSuccess(decodedText) {
+        function onMainScanSuccess(decodedText, decodedResult) {
+             console.log(`Barkod okundu: ${decodedText}`); // Debug message
             if (Date.now() - lastScanTime < 1500) return;
             lastScanTime = Date.now();
             const product = productDatabase[decodedText];
@@ -458,4 +475,4 @@
         });
     </script>
 </body>
-</ht
+</html>
