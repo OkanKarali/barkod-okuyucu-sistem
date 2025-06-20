@@ -273,30 +273,18 @@
             qrReaderDiv.classList.remove('hidden');
             scannerStatusElement.textContent = 'Kamera izni isteniyor...';
 
-            const scannerConfig = { fps: 10, qrbox: { width: 250, height: 150 } };
+            // IMPORTANT CHANGE: Removed qrbox to use full viewfinder for max compatibility
+            const scannerConfig = { fps: 10 };
 
             try {
-                // Request camera permissions first to get a list of cameras
-                const cameras = await Html5Qrcode.getCameras();
-                if (cameras && cameras.length) {
-                    // Try to find the back camera first
-                    const backCamera = cameras.find(c => c.label.toLowerCase().includes('back'));
-                    const cameraId = backCamera ? backCamera.id : cameras[0].id;
-                    
-                    scannerStatusElement.textContent = 'Kamera başlatılıyor...';
-                    await mainScanner.start(
-                        cameraId,
-                        scannerConfig,
-                        onMainScanSuccess,
-                        () => {}
-                    );
-                    isMainScannerActive = true;
-                    scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
-                } else {
-                     scannerStatusElement.textContent = 'Hiç kamera bulunamadı.';
-                     qrReaderDiv.classList.add('hidden');
-                     startCameraPrompt.classList.remove('hidden');
-                }
+                await mainScanner.start(
+                    { facingMode: "environment" }, 
+                    scannerConfig,
+                    onMainScanSuccess,
+                    () => {}
+                );
+                isMainScannerActive = true;
+                scannerStatusElement.textContent = 'Kamera aktif. Barkodu ekranın ortasına getirin.';
             } catch (err) {
                 console.error("Kamera başlatma hatası:", err);
                 scannerStatusElement.textContent = 'Kamera başlatılamadı!';
@@ -470,4 +458,4 @@
         });
     </script>
 </body>
-</html>
+</ht
