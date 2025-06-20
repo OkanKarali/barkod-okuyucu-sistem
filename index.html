@@ -187,7 +187,7 @@
         const resetButton = document.getElementById('reset-button');
         
         // --- Scanner Logic with Instascan ---
-        let scanner = new Instascan.Scanner({ video: document.getElementById('preview'), scanPeriod: 5, mirror: false });
+        let scanner = new Instascan.Scanner({ video: document.getElementById('preview'), scanPeriod: 3, mirror: false });
         
         scanner.addListener('scan', function(content) {
             if (Date.now() - lastScanTime < 3000) return; 
@@ -211,6 +211,7 @@
         
         function stopScanner() {
              scanner.stop();
+             scannerStatus.textContent = 'Kamera durduruldu.';
         }
 
         function onMainScanSuccess(decodedText) {
@@ -328,6 +329,7 @@
         // --- Event Listeners ---
         manageProductsBtn.addEventListener('click', () => {
             stopScanner();
+            renderProductManagementList();
             productModal.style.display = 'flex';
         });
         
