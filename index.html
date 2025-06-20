@@ -1,204 +1,87 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barkod Okuyucu Kasa Sistemi</title>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <style>
-        /* ... (stil kodları aynı kaldı, önceki versiyonun tamamı buraya yazılmıştı) ... */
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Barkod Okuyucu iOS Destekli</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f2f2f2;
+      padding: 20px;
+      text-align: center;
+    }
+    #qr-reader {
+      width: 100%;
+      max-width: 400px;
+      margin: auto;
+      border: 2px solid #007bff;
+      border-radius: 8px;
+    }
+    #scanner-status {
+      margin-top: 10px;
+      color: #666;
+    }
+    #scan-result {
+      margin-top: 20px;
+      font-weight: bold;
+      color: green;
+    }
+  </style>
 </head>
 <body>
-    <!-- (HTML gövdesi aynı kaldı - senin dosyanla birebir) -->
-    <div class="container">
-        <!-- Ana Uygulama Arayüzü -->
-        <h1>Barkod Okuyucu Kasa</h1>
-        <p style="text-align: center; margin-top: -0.5rem; margin-bottom: 1.5rem;">Ürünleri okutun veya manuel yönetin.</p>
+  <h1>Barkod Okuyucu</h1>
+  <div id="qr-reader"></div>
+  <p id="scanner-status">Kamera başlatılıyor...</p>
+  <p id="scan-result"></p>
 
-        <div style="margin-bottom: 1rem;">
-            <button id="manage-products-btn" class="btn-light btn-full">Ürünleri Yönet</button>
-        </div>
+  <script>
+    const scannerStatusElement = document.getElementById("scanner-status");
+    const scanResultElement = document.getElementById("scan-result");
 
-        <div id="scanner-container" style="background-color: #f0f2f5; border-radius: 8px; padding: 1rem; text-align: center; min-height: 150px;">
-            <div id="qr-reader" class="scanner-region" style="margin: 0 auto; max-width: 400px;"></div>
-            <p id="scanner-status" style="margin-top: 1rem; font-size: 0.9rem; color: #666;">Kamera başlatılıyor...</p>
-        </div>
+    const mainScanner = new Html5Qrcode("qr-reader");
+    let isMainScannerActive = false;
+    let lastScanTime = 0;
 
-        <p id="scan-result" style="text-align: center; font-weight: 500; min-height: 24px; padding: 0.5rem;"></p>
+    function startMainScanner() {
+      if (isMainScannerActive) return;
 
-        <div>
-            <h2>Okutulan Ürünler</h2>
-            <ul id="scanned-items-list" class="item-list">
-                <li id="empty-cart-message">Henüz ürün okutulmadı.</li>
-            </ul>
-        </div>
+      scannerStatusElement.textContent = "Kamera başlatılıyor...";
 
-        <div style="border-top: 1px solid #eee; padding-top: 1.5rem; margin-top: 1.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <span style="font-size: 1.5rem; font-weight: 700;">TOPLAM:</span>
-                <span id="total-price" style="font-size: 1.75rem; font-weight: 700; color: #007bff;">0.00 TL</span>
-            </div>
-            <button id="reset-button" class="btn-danger btn-full">Listeyi Sıfırla</button>
-        </div>
-    </div>
+      const config = {
+        fps: 10,
+        qrbox: { width: 300, height: 300 },
+        aspectRatio: 1.7777778 // 16:9
+      };
 
-    <!-- Ürün Yönetimi Modalı -->
-    <div id="product-modal" class="modal">
-        <div class="modal-content">
-            <!-- ... içerik aynı kaldı ... -->
-        </div>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDocs, setDoc, deleteDoc, onSnapshot, collection, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyA4ngudVTE3rCKerRinAIK7oD8UqT_bNC4",
-            authDomain: "karalimedia-1d72f.firebaseapp.com",
-            projectId: "karalimedia-1d72f",
-            storageBucket: "karalimedia-1d72f.appspot.com",
-            messagingSenderId: "177731209565",
-            appId: "1:177731209565:web:3dd98ef08fb86598500b4",
-            measurementId: "G-2V4B1H7SHT"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = firebaseConfig.projectId;
-
-        let productDatabase = {};
-        let productCollectionRef;
-        let unsubscribeProducts;
-
-        const scannerStatusElement = document.getElementById('scanner-status');
-        const scanResultElement = document.getElementById('scan-result');
-        const scannedItemsList = document.getElementById('scanned-items-list');
-        const totalPriceElement = document.getElementById('total-price');
-        const resetButton = document.getElementById('reset-button');
-
-        let cart = {};
-        let lastScanTime = 0;
-        const mainScanner = new Html5Qrcode("qr-reader", { verbose: false });
-        let isMainScannerActive = false;
-
-        async function listenForProductChanges(userId) {
-            productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
-            const initialSnapshot = await getDocs(productCollectionRef);
-            if (initialSnapshot.empty) {
-                await populateDefaultProducts(userId);
-            }
-
-            if (unsubscribeProducts) unsubscribeProducts();
-
-            unsubscribeProducts = onSnapshot(productCollectionRef, (snapshot) => {
-                const newDb = {};
-                snapshot.forEach(doc => { newDb[doc.id] = doc.data(); });
-                productDatabase = newDb;
-                renderProductManagementList('');
-            });
+      const constraints = {
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         }
+      };
 
-        async function populateDefaultProducts(userId) {
-            const collectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
-            const defaultDB = {
-                '8690632055610': { name: 'Ülker Çikolatalı Gofret', price: 7.50 },
-                '8690504012177': { name: 'Eti Canga 45g', price: 9.75 },
-            };
-            const batch = writeBatch(db);
-            Object.keys(defaultDB).forEach(barcode => {
-                const docRef = doc(collectionRef, barcode);
-                batch.set(docRef, defaultDB[barcode]);
-            });
-            await batch.commit();
-        }
-
-        function startMainScanner() {
-            if (isMainScannerActive) return;
-            scannerStatusElement.textContent = 'Kamera başlatılıyor...';
-
-            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
-
-            Html5Qrcode.getCameras().then(cameras => {
-                if (cameras && cameras.length) {
-                    const backCamera = cameras.find(cam => cam.label.toLowerCase().includes('back'));
-                    const selectedCameraId = backCamera ? backCamera.id : cameras[0].id;
-
-                    mainScanner.start(selectedCameraId, config, onMainScanSuccess)
-                        .then(() => {
-                            isMainScannerActive = true;
-                            scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
-                        })
-                        .catch(err => {
-                            console.error("Kamera başlatılamadı:", err);
-                            scannerStatusElement.textContent = `Kamera başlatılamadı: ${err}`;
-                        });
-                } else {
-                    scannerStatusElement.textContent = "Kamera bulunamadı.";
-                }
-            }).catch(err => {
-                console.error("Kamera listesi alınamadı:", err);
-                scannerStatusElement.textContent = `Kamera listesi alınamadı: ${err}`;
-            });
-        }
-
-        function onMainScanSuccess(decodedText) {
-            if (Date.now() - lastScanTime < 1500) return;
-            lastScanTime = Date.now();
-
-            const product = productDatabase[decodedText];
-            if (product) {
-                if (cart[decodedText]) {
-                    cart[decodedText].quantity++;
-                } else {
-                    cart[decodedText] = { ...product, quantity: 1 };
-                }
-                scanResultElement.textContent = `Eklendi: ${product.name}`;
-            } else {
-                scanResultElement.textContent = `Ürün bulunamadı: ${decodedText}`;
-            }
-            updateCartUI();
-        }
-
-        function updateCartUI() {
-            scannedItemsList.innerHTML = '';
-            if (Object.keys(cart).length === 0) {
-                scannedItemsList.innerHTML = `<li id="empty-cart-message">Henüz ürün okutulmadı.</li>`;
-            } else {
-                Object.keys(cart).forEach(barcode => {
-                    const item = cart[barcode];
-                    const li = document.createElement('li');
-                    li.innerHTML = `
-                        <div style="flex-grow: 1;">
-                            <strong class="product-name">${item.name}</strong>
-                            <br><small>${item.price.toFixed(2)} TL</small>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <button data-barcode="${barcode}" data-change="-1" class="quantity-btn btn-light" style="width: 35px;">-</button>
-                            <span style="font-weight: 600;">${item.quantity}</span>
-                            <button data-barcode="${barcode}" data-change="1" class="quantity-btn btn-light" style="width: 35px;">+</button>
-                        </div>
-                        <strong style="width: 80px; text-align: right;">${(item.price * item.quantity).toFixed(2)} TL</strong>`;
-                    scannedItemsList.appendChild(li);
-                });
-            }
-            const total = Object.values(cart).reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            totalPriceElement.textContent = `${total.toFixed(2)} TL`;
-        }
-
-        resetButton.addEventListener('click', () => { cart = {}; updateCartUI(); });
-
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                listenForProductChanges(user.uid);
-                startMainScanner();
-            } else {
-                signInAnonymously(auth);
-            }
+      mainScanner.start(constraints, config, onMainScanSuccess)
+        .then(() => {
+          isMainScannerActive = true;
+          scannerStatusElement.textContent = "Kamera aktif. Barkodu gösterin.";
+        })
+        .catch(err => {
+          console.error("Kamera başlatılamadı:", err);
+          scannerStatusElement.textContent = `Kamera başlatılamadı: ${err}`;
         });
-    </script>
+    }
+
+    function onMainScanSuccess(decodedText) {
+      if (Date.now() - lastScanTime < 1500) return;
+      lastScanTime = Date.now();
+      scanResultElement.textContent = "Okundu: " + decodedText;
+    }
+
+    // Başlat
+    startMainScanner();
+  </script>
 </body>
 </html>
