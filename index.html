@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barkod Okuyucu Kasa Sistemi</title>
-    <!-- html5-qrcode library for barcode scanning -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- NEW SCANNER LIBRARY: We are now using a different library for better compatibility -->
+    <script type="text/javascript" src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
     <style>
         /* Genel Stil Ayarları */
         body {
@@ -29,102 +29,49 @@
             padding: 1.5rem;
             box-sizing: border-box;
         }
-        /* Başlık Stilleri */
         h1 { font-size: 1.75rem; font-weight: 700; text-align: center; margin-bottom: 0.5rem; }
         h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
-        h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
         p { color: #666; line-height: 1.5; }
         
         /* Buton Stilleri */
         button {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            transition: background-color 0.2s, transform 0.1s;
+            padding: 10px 15px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 1rem; font-weight: 600; transition: background-color 0.2s, transform 0.1s;
         }
         button:active { transform: scale(0.98); }
         .btn-primary { background-color: #007bff; color: white; }
-        .btn-primary:hover { background-color: #0056b3; }
         .btn-danger { background-color: #dc3545; color: white; }
-        .btn-danger:hover { background-color: #c82333; }
-        .btn-secondary { background-color: #6c757d; color: white; }
-        .btn-secondary:hover { background-color: #5a6268; }
         .btn-light { background-color: #f8f9fa; color: #333; border: 1px solid #ddd; }
-        .btn-light:hover { background-color: #e2e6ea; }
         .btn-full { width: 100%; }
 
-        /* Form Elemanları */
+        /* Form ve Listeler */
         label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
         input[type="text"], input[type="number"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 1rem;
-            box-sizing: border-box;
-            margin-bottom: 1rem;
+            width: 100%; padding: 10px; border: 1px solid #ccc;
+            border-radius: 8px; font-size: 1rem; box-sizing: border-box; margin-bottom: 1rem;
         }
-        .form-group { margin-bottom: 1rem; }
-
-        /* Kamera ve Listeler */
-        .scanner-region { border: 2px solid #007bff; border-radius: 8px; overflow: hidden; }
         .item-list { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
         .item-list li {
-            padding: 1rem;
-            background-color: #fff;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 1rem; background-color: #fff; border-bottom: 1px solid #eee;
+            display: flex; justify-content: space-between; align-items: center;
         }
         .item-list li:last-child { border-bottom: none; }
         
-        /* Modal Stilleri */
+        /* Modal Stili */
         .modal {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            display: none; /* JS ile gösterilecek */
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);
+            display: none; justify-content: center; align-items: center; z-index: 100;
         }
         .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 500px;
+            background: white; padding: 2rem; border-radius: 12px;
+            width: 90%; max-width: 500px;
         }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
-    
-    <!-- Error Container -->
-    <div id="error-container" class="container hidden">
-        <h1 style="color: #dc3545;">Bağlantı Hatası</h1>
-        <p id="error-message" style="background-color: #f8d7da; padding: 1rem; border-radius: 8px; border: 1px solid #f5c6cb; color: #721c24;">
-            Uygulama, veritabanına bağlanamadı. Bu genellikle API anahtarı kısıtlamalarından kaynaklanır.
-        </p>
-        <div style="margin-top: 1rem; font-size: 0.9rem;">
-            <p><strong>Çözüm Adımları:</strong></p>
-            <ol style="list-style-type: decimal; padding-left: 20px;">
-                <li>Google Cloud Console'da projenizin "Kimlik Bilgileri" sayfasına gidin.</li>
-                <li>Kullandığınız API Anahtarını seçin.</li>
-                <li>"Uygulama kısıtlamaları" bölümünde "Web siteleri" seçeneğinin işaretli olduğundan emin olun.</li>
-                <li>"Web sitesi kısıtlamaları" altında, <strong>okankarali.github.io</strong> adresinin izin verilenler listesinde olduğundan emin olun. Eğer değilse ekleyin.</li>
-            </ol>
-        </div>
-    </div>
 
-    <!-- Main Application Container -->
-    <div id="main-app" class="container">
-        <!-- Ana Uygulama Arayüzü -->
+    <div class="container">
         <h1>Barkod Okuyucu Kasa</h1>
         <p style="text-align: center; margin-top: -0.5rem; margin-bottom: 1.5rem;">Ürünleri okutun veya manuel yönetin.</p>
         
@@ -133,11 +80,8 @@
         </div>
 
         <div id="scanner-container" style="background-color: #f0f2f5; border-radius: 8px; padding: 1rem; text-align: center; min-height: 150px;">
-             <div id="start-camera-prompt">
-                <button id="start-camera-btn" class="btn-primary">Kamerayı Başlat</button>
-                <p id="scanner-status" style="margin-top: 1rem; font-size: 0.9rem; color: #666;">Taramayı başlatmak için dokunun.</p>
-            </div>
-            <div id="qr-reader" class="scanner-region hidden" style="margin: 0 auto; max-width: 400px;"></div>
+            <video id="preview" style="width: 100%; border-radius: 8px;"></video>
+            <p id="scanner-status" style="margin-top: 1rem; font-size: 0.9rem; color: #666;">Kamera başlatılıyor...</p>
         </div>
         
         <p id="scan-result" style="text-align: center; font-weight: 500; min-height: 24px; padding: 0.5rem;"></p>
@@ -160,35 +104,14 @@
 
     <!-- Ürün Yönetimi Modalı -->
     <div id="product-modal" class="modal">
-        <div class="modal-content">
-            <h2 style="margin-top:0;">Ürün Yönetimi</h2>
-            <div style="margin-bottom: 1.5rem;">
-                <label for="product-search-input">Ürün Ara:</label>
-                <input type="text" id="product-search-input" placeholder="Ürün adıyla ara...">
-                <ul id="product-management-list" class="item-list" style="margin-top: 1rem;"></ul>
-            </div>
-            <div style="border-top: 1px solid #eee; padding-top: 1rem;">
-                 <h3 id="form-title">Yeni Ürün Ekle</h3>
-                 <form id="product-form">
-                     <input type="hidden" id="original-barcode-input">
-                     <div class="form-group"><label for="barcode-input">Barkod</label><input type="text" id="barcode-input" required></div>
-                     <div class="form-group"><label for="name-input">Ürün Adı</label><input type="text" id="name-input" required></div>
-                     <div class="form-group"><label for="price-input">Fiyat (TL)</label><input type="number" id="price-input" step="0.01" required></div>
-                     <div style="display:flex; gap: 10px;">
-                        <button type="submit" id="form-submit-button" class="btn-primary" style="flex-grow: 1;">Ekle</button>
-                        <button type="button" id="form-cancel-button" class="btn-secondary" style="flex-grow: 1;">İptal</button>
-                     </div>
-                 </form>
-            </div>
-            <button id="close-modal-btn" class="btn-light" style="margin-top: 1.5rem; width: 100%;">Kapat</button>
-        </div>
+        <!-- Modal içeriği buraya gelecek -->
     </div>
 
     <script type="module">
-        // Import Firebase services
+        // Firebase ve diğer servislerin import edilmesi
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDocs, setDoc, deleteDoc, onSnapshot, collection, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Initialization ---
         const firebaseConfig = {
@@ -208,100 +131,53 @@
         let productDatabase = {};
         let productCollectionRef;
         let unsubscribeProducts;
-
-        // --- DOM Elements ---
-        const mainAppContainer = document.getElementById('main-app');
-        const errorContainer = document.getElementById('error-container');
-        const manageProductsBtn = document.getElementById('manage-products-btn');
-        const productModal = document.getElementById('product-modal');
-        const closeModalBtn = document.getElementById('close-modal-btn');
-        const productManagementList = document.getElementById('product-management-list');
-        const productSearchInput = document.getElementById('product-search-input');
-        const productForm = document.getElementById('product-form');
-        const formTitle = document.getElementById('form-title');
-        const originalBarcode = document.getElementById('original-barcode-input');
-        const barcodeInput = document.getElementById('barcode-input');
-        const nameInput = document.getElementById('name-input');
-        const priceInput = document.getElementById('price-input');
-        const formSubmitBtn = document.getElementById('form-submit-button');
-        const formCancelBtn = document.getElementById('form-cancel-button');
-        const scannedItemsList = document.getElementById('scanned-items-list');
-        const totalPriceElement = document.getElementById('total-price');
-        const scanResultElement = document.getElementById('scan-result');
-        const scannerStatusElement = document.getElementById('scanner-status');
-        const resetButton = document.getElementById('reset-button');
-        const qrReaderDiv = document.getElementById('qr-reader');
-        const startCameraPrompt = document.getElementById('start-camera-prompt');
-        const startCameraBtn = document.getElementById('start-camera-btn');
-        
-        // --- App State ---
         let cart = {};
         let lastScanTime = 0;
-        const mainScanner = new Html5Qrcode("qr-reader", { verbose: false });
-        let isMainScannerActive = false;
 
-        // --- Firebase Data Functions ---
-        async function listenForProductChanges(userId) {
-            productCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
-            initialSnapshot = await getDocs(productCollectionRef);
-            if (initialSnapshot.empty) {
-                console.log("Ürün bulunamadı. Varsayılan veriler yükleniyor.");
-                await populateDefaultProducts(userId);
-            }
-            if(unsubscribeProducts) unsubscribeProducts();
-            unsubscribeProducts = onSnapshot(productCollectionRef, (snapshot) => {
-                productDatabase = {};
-                snapshot.forEach(doc => { productDatabase[doc.id] = doc.data(); });
-                console.log("Veritabanı güncellendi.");
-                renderProductManagementList(productSearchInput.value);
+        // --- DOM Elements ---
+        const scannerStatus = document.getElementById('scanner-status');
+        const scanResult = document.getElementById('scan-result');
+        const scannedItemsList = document.getElementById('scanned-items-list');
+        const totalPriceElement = document.getElementById('total-price');
+
+        // --- Scanner Logic with Instascan ---
+        let scanner = new Instascan.Scanner({ video: document.getElementById('preview'), scanPeriod: 5, mirror: false });
+        
+        scanner.addListener('scan', function(content) {
+            if (Date.now() - lastScanTime < 3000) return; // 3 saniye bekleme
+            lastScanTime = Date.now();
+            console.log(`Okunan barkod: ${content}`);
+            onMainScanSuccess(content);
+        });
+
+        function startScanner() {
+            Instascan.Camera.getCameras().then(function (cameras) {
+                if (cameras.length > 0) {
+                    // Genellikle arka kamera sonuncusu olur (1. index), yoksa ilkini kullan (0. index)
+                    let backCamera = cameras.find(c => c.name.toLowerCase().includes('back')) || cameras[cameras.length - 1] || cameras[0];
+                    scanner.start(backCamera);
+                    scannerStatus.textContent = 'Kamera aktif.';
+                } else {
+                    console.error('Kamera bulunamadı.');
+                    scannerStatus.textContent = 'Kamera bulunamadı.';
+                }
+            }).catch(function (e) {
+                console.error(e);
+                scannerStatus.textContent = 'Kamera hatası: ' + e.message;
             });
         }
-        async function populateDefaultProducts(userId) {
-             const collectionRef = collection(db, 'artifacts', appId, 'users', userId, 'products');
-            const defaultDB = { '8690632055610': { name: 'Ülker Gofret', price: 7.50 }, '8690504012177': { name: 'Eti Canga', price: 9.75 } };
-            const batch = writeBatch(db);
-            Object.keys(defaultDB).forEach(barcode => batch.set(doc(collectionRef, barcode), defaultDB[barcode]));
-            await batch.commit();
-        }
 
-        // --- Scanner Logic ---
-        function startMainScanner() {
-            if (isMainScannerActive) return;
-            startCameraPrompt.classList.add('hidden');
-            qrReaderDiv.classList.remove('hidden');
-            scannerStatusElement.textContent = 'Kamera izni isteniyor...';
-            const config = { fps: 10 };
-            mainScanner.start({ facingMode: "environment" }, config, onMainScanSuccess)
-                .then(() => {
-                    isMainScannerActive = true;
-                    scannerStatusElement.textContent = 'Kamera aktif. Barkodu taratın.';
-                })
-                .catch(err => {
-                    console.error("Kamera başlatılamadı:", err);
-                    scannerStatusElement.textContent = 'Kamera başlatılamadı!';
-                    qrReaderDiv.classList.add('hidden');
-                    startCameraPrompt.classList.remove('hidden');
-                });
-        }
-        function stopMainScanner() {
-            if (!isMainScannerActive) return;
-            mainScanner.stop().then(() => {
-                isMainScannerActive = false;
-                qrReaderDiv.classList.add('hidden');
-                startCameraPrompt.classList.remove('hidden');
-                scannerStatusElement.textContent = 'Taramayı başlatmak için dokunun.';
-            }).catch(err => console.error("Kamera durdurulamadı:", err));
-        }
         function onMainScanSuccess(decodedText) {
-            if (Date.now() - lastScanTime < 1500) return;
-            lastScanTime = Date.now();
             const product = productDatabase[decodedText];
             if (product) {
-                cart[decodedText] = cart[decodedText] || { ...product, quantity: 0 };
-                cart[decodedText].quantity++;
-                scanResultElement.textContent = `Eklendi: ${product.name}`;
+                if(cart[decodedText]) {
+                    cart[decodedText].quantity++;
+                } else {
+                    cart[decodedText] = { ...product, quantity: 1 };
+                }
+                scanResult.textContent = `Eklendi: ${product.name}`;
             } else {
-                scanResultElement.textContent = `Ürün bulunamadı: ${decodedText}`;
+                scanResult.textContent = `Ürün bulunamadı: ${decodedText}`;
             }
             updateCartUI();
         }
@@ -316,83 +192,38 @@
                     const item = cart[barcode];
                     const li = document.createElement('li');
                     li.innerHTML = `
-                        <div style="flex-grow: 1;"><strong class="product-name">${item.name}</strong><br><small>${item.price.toFixed(2)} TL</small></div>
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <button data-barcode="${barcode}" data-change="-1" class="quantity-btn btn-light" style="width: 35px; height: 35px; line-height: 1;">-</button>
-                            <span style="font-weight: 600; min-width: 20px; text-align: center;">${item.quantity}</span>
-                            <button data-barcode="${barcode}" data-change="1" class="quantity-btn btn-light" style="width: 35px; height: 35px; line-height: 1;">+</button>
+                        <div style="flex-grow: 1;">
+                            <strong>${item.name}</strong><br><small>${item.price.toFixed(2)} TL</small>
                         </div>
-                        <strong class="product-total" style="width: 80px; text-align: right;">${(item.price * item.quantity).toFixed(2)} TL</strong>`;
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                             <button data-barcode="${barcode}" data-change="-1" class="quantity-btn btn-light" style="width: 35px; height: 35px; line-height: 1;">-</button>
+                             <span style="font-weight: 600; min-width: 20px; text-align: center;">${item.quantity}</span>
+                             <button data-barcode="${barcode}" data-change="1" class="quantity-btn btn-light" style="width: 35px; height: 35px; line-height: 1;">+</button>
+                        </div>
+                        <strong style="width: 80px; text-align: right;">${(item.price * item.quantity).toFixed(2)} TL</strong>`;
                     scannedItemsList.appendChild(li);
                 });
             }
-            totalPriceElement.textContent = `${Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)} TL`;
+            totalPriceElement.textContent = `${Object.values(cart).reduce((s, i) => s + i.price * i.quantity, 0).toFixed(2)} TL`;
         }
-        function renderProductManagementList(searchTerm = '') {
-             productManagementList.innerHTML = '';
-             const lowerCaseSearchTerm = searchTerm.toLowerCase();
-             const filtered = Object.keys(productDatabase).filter(b => productDatabase[b].name.toLowerCase().includes(lowerCaseSearchTerm));
-             if (filtered.length === 0) { productManagementList.innerHTML = `<li>Sonuç bulunamadı.</li>`; return; }
-             filtered.sort((a,b) => productDatabase[a].name.localeCompare(productDatabase[b].name)).forEach(barcode => {
-                const item = productDatabase[barcode];
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <div style="flex-grow: 1;"><strong>${item.name}</strong><br><small>Barkod: ${barcode} - Fiyat: ${item.price.toFixed(2)} TL</small></div>
-                    <div><button data-barcode="${barcode}" class="btn-light edit-btn" style="margin-right: 5px;">Düzenle</button><button data-barcode="${barcode}" class="btn-danger delete-btn">Sil</button></div>`;
-                productManagementList.appendChild(li);
-             });
-        }
-        function populateFormForEditing(barcode, item) {
-            originalBarcode.value = barcode;
-            barcodeInput.value = barcode;
-            nameInput.value = item.name;
-            priceInput.value = item.price;
-            formSubmitBtn.textContent = 'Güncelle';
-        }
-        function resetProductForm() { productForm.reset(); originalBarcode.value = ''; formSubmitBtn.textContent = 'Ekle'; }
-
-        // --- Event Listeners ---
-        startCameraBtn.addEventListener('click', startMainScanner);
-        resetButton.addEventListener('click', () => { cart = {}; updateCartUI(); });
-        manageProductsBtn.addEventListener('click', () => { stopMainScanner(); productModal.style.display = 'flex'; });
-        closeModalBtn.addEventListener('click', () => { productModal.style.display = 'none'; startMainScanner(); });
-        productSearchInput.addEventListener('input', e => renderProductManagementList(e.target.value));
-        productManagementList.addEventListener('click', e => {
-            if (e.target.classList.contains('edit-btn')) populateFormForEditing(e.target.dataset.barcode, productDatabase[e.target.dataset.barcode]);
-            if (e.target.classList.contains('delete-btn') && confirm(`'${productDatabase[e.target.dataset.barcode].name}' ürününü silmek istediğinize emin misiniz?`)) deleteDoc(doc(productCollectionRef, e.target.dataset.barcode));
-        });
-        productForm.addEventListener('submit', async e => {
-            e.preventDefault();
-            const barcode = barcodeInput.value.trim(), name = nameInput.value.trim(), price = parseFloat(priceInput.value), originalBC = originalBarcode.value;
-            if (!barcode || !name || isNaN(price)) return alert('Lütfen tüm alanları doldurun.');
-            if (originalBC && originalBC !== barcode) await deleteDoc(doc(productCollectionRef, originalBC));
-            await setDoc(doc(productCollectionRef, barcode), { name, price });
-            resetProductForm();
-        });
-        formCancelBtn.addEventListener('click', resetProductForm);
-        scannedItemsList.addEventListener('click', e => {
-            const btn = e.target.closest('.quantity-btn');
-            if (btn) {
-                const barcode = btn.dataset.barcode, change = parseInt(btn.dataset.change, 10);
-                if (cart[barcode]) { cart[barcode].quantity += change; if (cart[barcode].quantity <= 0) delete cart[barcode]; updateCartUI(); }
+        
+        // --- Firebase and Initialization ---
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                productCollectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'products');
+                if (unsubscribeProducts) unsubscribeProducts();
+                unsubscribeProducts = onSnapshot(productCollectionRef, (snapshot) => {
+                    productDatabase = {};
+                    snapshot.forEach(doc => { productDatabase[doc.id] = doc.data(); });
+                    console.log("Veritabanı güncellendi.");
+                });
+                startScanner();
+            } else {
+                signInAnonymously(auth);
             }
         });
         
-        // --- Auth State Change ---
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                console.log("Kullanıcı giriş yaptı:", user.uid);
-                listenForProductChanges(user.uid);
-            } else {
-                signInAnonymously(auth).catch(err => {
-                    console.error("Anonim giriş hatası:", err);
-                    if (err.code === 'auth/requests-from-referer-are-blocked') {
-                        mainAppContainer.classList.add('hidden');
-                        errorContainer.classList.remove('hidden');
-                    }
-                });
-            }
-        });
+         // Add other event listeners for manage products, reset, etc. here
     </script>
 </body>
 </html>
