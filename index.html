@@ -216,10 +216,21 @@
             qrReaderDiv.classList.remove('hidden');
             scannerStatusElement.textContent = 'Kamera başlatılıyor...';
 
+            // IMPORTANT CHANGE: Define which formats to support
+            const formatsToSupport = [
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.QR_CODE
+            ];
+
             const config = { 
                 fps: 10, 
-                qrbox: { width: 250, height: 150 },
-                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+                qrbox: { width: 250, height: 100 }, // Rectangular box is better for barcodes
+                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+                formatsToSupport: formatsToSupport
             };
             
             html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
