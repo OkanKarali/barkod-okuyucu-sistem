@@ -42,9 +42,9 @@
   <button onclick="switchCamera()">Kamerayı Değiştir</button>
 
   <script type="module">
-    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@latest';
+    import * as ZXing from 'https://cdn.jsdelivr.net/npm/@zxing/browser@latest/+esm';
 
-    const codeReader = new BrowserMultiFormatReader();
+    const codeReader = new ZXing.BrowserMultiFormatReader();
     const video = document.getElementById('video');
     const result = document.getElementById('result');
     const zoomSlider = document.getElementById('zoomSlider');
