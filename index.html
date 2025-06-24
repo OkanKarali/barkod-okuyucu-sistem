@@ -1,12 +1,19 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" manifest="">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Barkod Okuyucu</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Barkod Okuyucu">
+  <link rel="apple-touch-icon" href="icon.png">
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
       font-family: sans-serif;
       background: #000;
       color: #fff;
@@ -14,6 +21,7 @@
     }
     video {
       width: 100%;
+      height: auto;
       max-height: 60vh;
       object-fit: cover;
       background: #000;
