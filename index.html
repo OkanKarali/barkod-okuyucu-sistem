@@ -5,17 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Barkod Okuyucu</title>
   <style>
-    body { margin: 0; font-family: sans-serif; background: #000; color: #fff; text-align: center; }
-    video { width: 100%; max-height: 60vh; object-fit: cover; background: #000; }
-    #result { padding: 10px; font-size: 1.2em; background: #222; }
-    button, input[type="range"] { margin: 10px; padding: 10px 20px; font-size: 1em; }
-    #zoomSlider { width: 80%; }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #000;
+      color: #fff;
+      text-align: center;
+    }
+    video {
+      width: 100%;
+      max-height: 60vh;
+      object-fit: cover;
+      background: #000;
+    }
+    #result {
+      padding: 10px;
+      font-size: 1.2em;
+      background: #222;
+    }
+    button, input[type="range"] {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+    }
+    #zoomSlider {
+      width: 80%;
+      display: none;
+    }
   </style>
 </head>
 <body>
   <h2>📷 Barkod Okuyucu</h2>
   <video id="video" autoplay muted playsinline></video>
-  <input type="range" id="zoomSlider" min="1" max="1" step="0.1" style="display:none;">
+  <input type="range" id="zoomSlider" min="1" max="1" step="0.1">
   <div id="result">Tarama bekleniyor...</div>
   <button onclick="switchCamera()">Kamerayı Değiştir</button>
 
@@ -35,14 +57,12 @@
       }
 
       try {
-        const constraints = {
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { exact: currentFacing },
-            focusMode: "continuous" // Otomatik netleme (çoğu cihazda default)
+            facingMode: currentFacing
           }
-        };
+        });
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         currentStream = stream;
         video.srcObject = stream;
 
@@ -50,7 +70,7 @@
         const capabilities = track.getCapabilities();
         const settings = track.getSettings();
 
-        // Zoom desteği varsa slider'ı göster
+        // Zoom desteği kontrolü
         if ('zoom' in capabilities) {
           zoomSlider.style.display = 'block';
           zoomSlider.min = capabilities.zoom.min;
@@ -65,13 +85,14 @@
           zoomSlider.style.display = 'none';
         }
 
+        // Barkod taraması
         codeReader.decodeFromVideoDevice(null, video, (res, err) => {
           if (res) {
             result.textContent = '✅ Barkod: ' + res.getText();
           }
         });
       } catch (e) {
-        result.textContent = '🚫 Kamera erişimi başarısız: ' + e.message;
+        result.textContent = '🚫 Kamera hatası: ' + e.message;
       }
     }
 
