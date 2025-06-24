@@ -18,6 +18,25 @@
       object-fit: cover;
       background: #000;
     }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+    .corner {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border: 4px solid red;
+    }
+    .top-left { top: 10%; left: 10%; border-right: none; border-bottom: none; }
+    .top-right { top: 10%; right: 10%; border-left: none; border-bottom: none; }
+    .bottom-left { bottom: 10%; left: 10%; border-right: none; border-top: none; }
+    .bottom-right { bottom: 10%; right: 10%; border-left: none; border-top: none; }
+    .corner.scanned { border-color: lime; }
     #result {
       padding: 10px;
       font-size: 1.2em;
@@ -36,7 +55,15 @@
 </head>
 <body>
   <h2>📷 Barkod Okuyucu</h2>
-  <video id="video" autoplay muted playsinline></video>
+  <div style="position: relative; display: inline-block; width: 100%;">
+    <video id="video" autoplay muted playsinline></video>
+    <div id="overlay">
+      <div class="corner top-left"></div>
+      <div class="corner top-right"></div>
+      <div class="corner bottom-left"></div>
+      <div class="corner bottom-right"></div>
+    </div>
+  </div>
   <input type="range" id="zoomSlider" min="1" max="1" step="0.1">
   <div id="result">Tarama bekleniyor...</div>
   <button onclick="switchCamera()">Kamerayı Değiştir</button>
@@ -48,6 +75,7 @@
     const video = document.getElementById('video');
     const result = document.getElementById('result');
     const zoomSlider = document.getElementById('zoomSlider');
+    const corners = document.querySelectorAll('.corner');
     let currentFacing = 'environment';
     let currentStream;
 
@@ -70,7 +98,6 @@
         const capabilities = track.getCapabilities();
         const settings = track.getSettings();
 
-        // Zoom desteği kontrolü
         if ('zoom' in capabilities) {
           zoomSlider.style.display = 'block';
           zoomSlider.min = capabilities.zoom.min;
@@ -85,10 +112,11 @@
           zoomSlider.style.display = 'none';
         }
 
-        // Barkod taraması
         codeReader.decodeFromVideoDevice(null, video, (res, err) => {
           if (res) {
             result.textContent = '✅ Barkod: ' + res.getText();
+            corners.forEach(corner => corner.classList.add('scanned'));
+            setTimeout(() => corners.forEach(c => c.classList.remove('scanned')), 1000);
           }
         });
       } catch (e) {
